@@ -1,16 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/health", "destination": "https://RENDER_URL_PLACEHOLDER/health" },
-    { "source": "/grid", "destination": "https://RENDER_URL_PLACEHOLDER/grid" },
-    { "source": "/grid/generate", "destination": "https://RENDER_URL_PLACEHOLDER/grid/generate" },
-    { "source": "/pois", "destination": "https://RENDER_URL_PLACEHOLDER/pois" },
-    { "source": "/profiles", "destination": "https://RENDER_URL_PLACEHOLDER/profiles" },
-    { "source": "/profile", "destination": "https://RENDER_URL_PLACEHOLDER/profile" },
-    { "source": "/config", "destination": "https://RENDER_URL_PLACEHOLDER/config" },
-    { "source": "/collect", "destination": "https://RENDER_URL_PLACEHOLDER/collect" },
-    { "source": "/collect/mock", "destination": "https://RENDER_URL_PLACEHOLDER/collect/mock" },
-    { "source": "/compute-profiles", "destination": "https://RENDER_URL_PLACEHOLDER/compute-profiles" }
+    { "source": "/health", "destination": "https://grid-poi-profiler.onrender.com/health" },
+    { "source": "/grid", "destination": "https://grid-poi-profiler.onrender.com/grid" },
+    { "source": "/grid/generate", "destination": "https://grid-poi-profiler.onrender.com/grid/generate" },
+    { "source": "/pois", "destination": "https://grid-poi-profiler.onrender.com/pois" },
+    { "source": "/profiles", "destination": "https://grid-poi-profiler.onrender.com/profiles" },
+    { "source": "/profile", "destination": "https://grid-poi-profiler.onrender.com/profile" },
+    { "source": "/config", "destination": "https://grid-poi-profiler.onrender.com/config" },
+    { "source": "/collect", "destination": "https://grid-poi-profiler.onrender.com/collect" },
+    { "source": "/collect/mock", "destination": "https://grid-poi-profiler.onrender.com/collect/mock" },
+    { "source": "/compute-profiles", "destination": "https://grid-poi-profiler.onrender.com/compute-profiles" }
   ],
   "headers": [
     {
