@@ -217,10 +217,15 @@ function toggleLayer(name) {
   else map.removeLayer(layers[name]);
 }
 
+// Use Render backend directly in production, relative paths for local dev
+const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? ''
+  : 'https://grid-poi-profiler.onrender.com';
+
 async function api(method, path) {
   try {
     const opts = method === 'POST' ? { method: 'POST' } : {};
-    const res = await fetch(path, opts);
+    const res = await fetch(API_BASE + path, opts);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || res.statusText);
