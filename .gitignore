@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+*.db
+*.db-shm
+*.db-wal
+*.db-info
+local.db
+.venv/
+venv/
+.vercel/
+node_modules/
+.pytest_cache/
+*.log

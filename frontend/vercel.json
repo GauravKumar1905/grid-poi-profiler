@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/health", "destination": "https://RENDER_URL_PLACEHOLDER/health" },
+    { "source": "/grid", "destination": "https://RENDER_URL_PLACEHOLDER/grid" },
+    { "source": "/grid/generate", "destination": "https://RENDER_URL_PLACEHOLDER/grid/generate" },
+    { "source": "/pois", "destination": "https://RENDER_URL_PLACEHOLDER/pois" },
+    { "source": "/profiles", "destination": "https://RENDER_URL_PLACEHOLDER/profiles" },
+    { "source": "/profile", "destination": "https://RENDER_URL_PLACEHOLDER/profile" },
+    { "source": "/config", "destination": "https://RENDER_URL_PLACEHOLDER/config" },
+    { "source": "/collect", "destination": "https://RENDER_URL_PLACEHOLDER/collect" },
+    { "source": "/collect/mock", "destination": "https://RENDER_URL_PLACEHOLDER/collect/mock" },
+    { "source": "/compute-profiles", "destination": "https://RENDER_URL_PLACEHOLDER/compute-profiles" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    }
+  ]
+}

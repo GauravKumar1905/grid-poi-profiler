@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grid POI Profiler — Gurgaon</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f0f; color: #e0e0e0; }
+
+  #sidebar {
+    position: fixed; top: 0; left: 0; width: 320px; height: 100vh;
+    background: #1a1a2e; padding: 20px; overflow-y: auto; z-index: 1000;
+    border-right: 1px solid #2a2a4a;
+  }
+  #sidebar h1 { font-size: 18px; color: #7c83ff; margin-bottom: 4px; }
+  #sidebar .subtitle { font-size: 12px; color: #888; margin-bottom: 20px; }
+
+  .btn {
+    display: block; width: 100%; padding: 10px 16px; margin-bottom: 8px;
+    background: #2a2a4a; color: #c0c4ff; border: 1px solid #3a3a6a;
+    border-radius: 6px; cursor: pointer; font-size: 13px; text-align: left;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: #3a3a6a; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn .icon { margin-right: 6px; }
+  .btn-sm { font-size: 11px; padding: 6px 16px; opacity: 0.7; }
+
+  .stats {
+    margin-top: 16px; padding: 12px; background: #12122a; border-radius: 6px;
+    font-size: 12px; line-height: 1.8;
+  }
+  .stats .label { color: #888; }
+  .stats .value { color: #7c83ff; font-weight: 600; }
+
+  #status {
+    margin-top: 12px; padding: 10px; border-radius: 6px;
+    font-size: 12px; display: none;
+  }
+  #status.info { display: block; background: #1a2a4a; color: #6cb4ff; }
+  #status.success { display: block; background: #1a3a2a; color: #6cff9a; }
+  #status.error { display: block; background: #3a1a1a; color: #ff6c6c; }
+
+  .layer-toggle { margin-top: 16px; }
+  .layer-toggle label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: #aaa; margin-bottom: 6px; cursor: pointer;
+  }
+  .layer-toggle input[type=checkbox] { accent-color: #7c83ff; }
+
+  .legend { margin-top: 16px; font-size: 11px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  #map { position: fixed; top: 0; left: 320px; right: 0; bottom: 0; }
+
+  .profile-popup { max-width: 360px; max-height: 400px; overflow-y: auto; font-size: 12px; }
+  .profile-popup h3 { color: #333; margin-bottom: 8px; }
+  .profile-popup .section { margin-bottom: 8px; }
+  .profile-popup .bar-row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+  .profile-popup .bar-label { width: 60px; text-align: right; font-size: 11px; color: #666; }
+  .profile-popup .bar-track { flex: 1; height: 14px; background: #eee; border-radius: 3px; overflow: hidden; }
+  .profile-popup .bar-fill { height: 100%; border-radius: 3px; }
+  .profile-popup .bar-val { width: 36px; font-size: 11px; color: #555; }
+
+  .leaflet-marker-icon.poi-dot {
+    border-radius: 50%; border: 1px solid rgba(0,0,0,0.3);
+  }
+
+  /* Search box */
+  .search-box { margin-bottom: 16px; position: relative; }
+  .search-box input {
+    width: 100%; padding: 10px 36px 10px 12px; background: #12122a; color: #e0e0e0;
+    border: 1px solid #3a3a6a; border-radius: 6px; font-size: 13px; outline: none;
+  }
+  .search-box input:focus { border-color: #7c83ff; }
+  .search-box input::placeholder { color: #666; }
+  .search-icon {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    color: #666; font-size: 14px; pointer-events: none;
+  }
+  .search-results {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 2000;
+    background: #1a1a2e; border: 1px solid #3a3a6a; border-top: none;
+    border-radius: 0 0 6px 6px; max-height: 240px; overflow-y: auto;
+    display: none;
+  }
+  .search-results.visible { display: block; }
+  .search-result-item {
+    padding: 8px 12px; cursor: pointer; font-size: 12px; color: #ccc;
+    border-bottom: 1px solid #2a2a4a;
+  }
+  .search-result-item:hover { background: #2a2a4a; color: #fff; }
+  .search-result-item .result-name { font-weight: 600; color: #c0c4ff; }
+  .search-result-item .result-addr { color: #888; font-size: 11px; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>Grid POI Profiler</h1>
+  <p class="subtitle">Full Gurgaon — Targeted Taxi Ads</p>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search location..." autocomplete="off"
+           oninput="onSearchInput(this.value)" onkeydown="onSearchKey(event)">
+    <span class="search-icon">&#128269;</span>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+
+  <button class="btn" onclick="doGenerate()"><span class="icon">&#9638;</span> Generate Grid</button>
+  <button class="btn" onclick="doCollect()"><span class="icon">&#8681;</span> Collect POIs (API)</button>
+  <button class="btn btn-sm" onclick="doForceCollect()"><span class="icon">&#8635;</span> Force Re-collect (uses quota)</button>
+  <button class="btn" onclick="doCompute()"><span class="icon">&#9881;</span> Compute Profiles</button>
+  <button class="btn" onclick="doRefreshAll()"><span class="icon">&#8635;</span> Refresh Map</button>
+
+  <div class="stats" id="stats">
+    <div><span class="label">Grid points:</span> <span class="value" id="stat-grid">0</span></div>
+    <div><span class="label">POIs collected:</span> <span class="value" id="stat-pois">0</span></div>
+    <div><span class="label">Profiles:</span> <span class="value" id="stat-profiles">0</span></div>
+    <div><span class="label">Visible profiles:</span> <span class="value" id="stat-visible">0</span></div>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="layer-toggle">
+    <label><input type="checkbox" id="togglePois" checked onchange="toggleLayer('pois')"> POI Markers (clustered)</label>
+    <label><input type="checkbox" id="toggleProfiles" checked onchange="toggleLayer('profiles')"> Profile Circles</label>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#ff6b6b"></div> Hospital/Health</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ffd93d"></div> School/Education</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#6bcb77"></div> Shopping/Commercial</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4d96ff"></div> Transit</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ff922b"></div> Restaurant/Food</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> Office/Business</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> Park/Recreation</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div> Entertainment</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div> Lifestyle/Worship</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#94a3b8"></div> Lodging</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div> Residential</div>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+// Gurgaon center
+const CENTER = [28.44, 76.985];
+
+const map = L.map('map', { preferCanvas: true }).setView(CENTER, 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '&copy; OpenStreetMap'
+}).addTo(map);
+
+// Layer groups
+const poiCluster = L.markerClusterGroup({
+  maxClusterRadius: 50,
+  disableClusteringAtZoom: 16,
+  spiderfyOnMaxZoom: true,
+  chunkedLoading: true,
+});
+map.addLayer(poiCluster);
+
+const profilesLayer = L.layerGroup().addTo(map);
+
+const layers = { pois: poiCluster, profiles: profilesLayer };
+
+const POI_COLORS = {
+  hospital: '#ff6b6b', school: '#ffd93d', university: '#ffd93d',
+  shopping_mall: '#6bcb77', store: '#6bcb77', restaurant: '#ff922b',
+  transit_station: '#4d96ff',
+  park: '#10b981', gym: '#10b981',
+  movie_theater: '#c084fc', bar: '#c084fc', night_club: '#c084fc',
+  place_of_worship: '#f472b6', lodging: '#94a3b8',
+  corporate_office: '#3b82f6', coworking_space: '#3b82f6', it_park: '#3b82f6',
+  residential: '#a78bfa',
+};
+
+const ATTR_COLORS = {
+  health: '#ff6b6b', education: '#ffd93d', commercial: '#6bcb77',
+  transit: '#4d96ff', residential: '#a78bfa', other: '#888',
+  office: '#3b82f6', recreation: '#10b981', entertainment: '#c084fc',
+  hospitality: '#94a3b8',
+};
+
+const INTEREST_COLORS = {
+  education: '#ffd93d', shopping: '#6bcb77', food: '#ff922b',
+  health: '#ff6b6b', transit: '#4d96ff', entertainment: '#c084fc',
+  business: '#3b82f6', lifestyle: '#f472b6',
+};
+
+// All data cached in memory
+let allGridPoints = [];
+let allPois = [];
+let allProfiles = [];
+let profileMap = {};  // grid_point_id -> profile
+let gpMap = {};       // grid_point_id -> grid_point
+
+function setStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = type;
+}
+
+function toggleLayer(name) {
+  const id = 'toggle' + name.charAt(0).toUpperCase() + name.slice(1);
+  const checked = document.getElementById(id).checked;
+  if (checked) map.addLayer(layers[name]);
+  else map.removeLayer(layers[name]);
+}
+
+async function api(method, path) {
+  try {
+    const opts = method === 'POST' ? { method: 'POST' } : {};
+    const res = await fetch(path, opts);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || res.statusText);
+    }
+    return await res.json();
+  } catch (e) {
+    setStatus('Error: ' + e.message, 'error');
+    throw e;
+  }
+}
+
+// ---- Actions ----
+
+async function doGenerate() {
+  setStatus('Generating grid (this may take a moment for full Gurgaon)...', 'info');
+  const data = await api('POST', '/grid/generate');
+  setStatus(data.message, 'success');
+  await loadGrid();
+}
+
+async function doCollect() {
+  setStatus('Checking stored POIs...', 'info');
+  const data = await api('POST', '/collect');
+  if (data.cached) {
+    setStatus(data.message, 'success');
+    await loadPois();
+    return;
+  }
+  setStatus('Collecting POIs (this will take several minutes for full Gurgaon)...', 'info');
+  setStatus(data.message, 'success');
+  await loadPois();
+}
+
+async function doForceCollect() {
+  if (!confirm('This will re-fetch ALL POIs from Google Places API (~3,400 calls, ~$109). Continue?')) return;
+  setStatus('Re-collecting POIs from API (several minutes)...', 'info');
+  const data = await api('POST', '/collect?force=true');
+  setStatus(data.message, 'success');
+  await loadPois();
+}
+
+async function doCompute() {
+  setStatus('Computing profiles for all grid points (may take a minute)...', 'info');
+  const data = await api('POST', '/compute-profiles');
+  setStatus(data.message, 'success');
+  await loadProfiles();
+}
+
+async function doRefreshAll() {
+  setStatus('Loading data...', 'info');
+  await loadGrid();
+  await loadPois();
+  await loadProfiles();
+  setStatus(`Loaded: ${allGridPoints.length} grid pts, ${allPois.length} POIs, ${allProfiles.length} profiles`, 'success');
+}
+
+// ---- Data Loaders ----
+
+async function loadGrid() {
+  const data = await api('GET', '/grid');
+  allGridPoints = data.grid_points;
+  gpMap = {};
+  allGridPoints.forEach(gp => { gpMap[gp.id] = gp; });
+  document.getElementById('stat-grid').textContent = data.count;
+}
+
+async function loadPois() {
+  const data = await api('GET', '/pois');
+  allPois = data.pois;
+  document.getElementById('stat-pois').textContent = data.count;
+  renderPois();
+}
+
+async function loadProfiles() {
+  const data = await api('GET', '/profiles');
+  allProfiles = data.profiles;
+  profileMap = {};
+  allProfiles.forEach(p => { profileMap[p.grid_point_id] = p; });
+  document.getElementById('stat-profiles').textContent = data.count;
+  renderViewportProfiles();
+}
+
+// ---- Renderers ----
+
+function renderPois() {
+  poiCluster.clearLayers();
+  const markers = [];
+  allPois.forEach(poi => {
+    const ptype = (poi.types || []).find(t => POI_COLORS[t]) || 'other';
+    const color = POI_COLORS[ptype] || '#888';
+    const marker = L.circleMarker([poi.lat, poi.lon], {
+      radius: 6, color, fillColor: color, fillOpacity: 0.85, weight: 1,
+    });
+    marker.bindPopup(`<b>${poi.name}</b><br>Type: ${ptype}<br>Rating: ${poi.rating || 'N/A'}<br>Reviews: ${poi.user_ratings_total || 'N/A'}`);
+    markers.push(marker);
+  });
+  poiCluster.addLayers(markers);
+}
+
+function buildProfilePopup(p) {
+  const attrs = p.geo_attrs || [];
+  const audience = p.audience || {};
+  const ageProfile = audience.age_profile || {};
+  const interests = audience.interests || {};
+  const counts = (p.poi_summary || {}).counts || {};
+
+  let html = `<div class="profile-popup">
+    <h3>${p.grid_point_id}</h3>
+    <div class="section"><b>Geo:</b> ${attrs.join(', ') || 'none'}</div>
+    <div class="section"><b>Confidence:</b> ${audience.confidence || 0} &nbsp; <b>Footfall:</b> ${audience.footfall_proxy || 0}</div>
+    <div class="section"><b>Age Profile</b>`;
+  for (const [bucket, val] of Object.entries(ageProfile)) {
+    const pct = Math.round(val * 100);
+    html += `<div class="bar-row">
+      <span class="bar-label">${bucket}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:#7c83ff"></div></div>
+      <span class="bar-val">${pct}%</span>
+    </div>`;
+  }
+  html += `</div><div class="section"><b>Interests</b>`;
+  for (const [cat, val] of Object.entries(interests)) {
+    const pct = Math.round(val * 100);
+    const iColor = INTEREST_COLORS[cat] || '#888';
+    html += `<div class="bar-row">
+      <span class="bar-label">${cat}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${iColor}"></div></div>
+      <span class="bar-val">${pct}%</span>
+    </div>`;
+  }
+  html += `</div>`;
+  if (Object.keys(counts).length) {
+    html += `<div class="section"><b>Nearby POIs</b><br>`;
+    for (const [t, c] of Object.entries(counts)) {
+      html += `${t}: ${c} &nbsp; `;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function renderViewportProfiles() {
+  profilesLayer.clearLayers();
+  if (!allProfiles.length) return;
+
+  const bounds = map.getBounds();
+  let visible = 0;
+
+  allProfiles.forEach(p => {
+    const gp = gpMap[p.grid_point_id];
+    if (!gp) return;
+    if (!bounds.contains([gp.lat, gp.lon])) return;
+
+    const attrs = p.geo_attrs || [];
+    const dominant = attrs[0] || 'other';
+    const color = ATTR_COLORS[dominant] || '#888';
+
+    L.circle([gp.lat, gp.lon], {
+      radius: 100, color, fillColor: color, fillOpacity: 0.2, weight: 1.5,
+    }).bindPopup(buildProfilePopup(p), { maxWidth: 400 }).addTo(profilesLayer);
+    visible++;
+  });
+
+  document.getElementById('stat-visible').textContent = visible;
+}
+
+// Re-render profiles when viewport changes
+map.on('moveend', renderViewportProfiles);
+
+// ---- Location Search (Nominatim geocoding) ----
+
+let searchTimer = null;
+let searchMarker = null;
+
+function onSearchInput(query) {
+  clearTimeout(searchTimer);
+  const resultsEl = document.getElementById('searchResults');
+  if (query.length < 3) {
+    resultsEl.className = 'search-results';
+    return;
+  }
+  searchTimer = setTimeout(() => doSearch(query), 350);
+}
+
+function onSearchKey(e) {
+  if (e.key === 'Escape') {
+    document.getElementById('searchResults').className = 'search-results';
+    document.getElementById('searchInput').blur();
+  }
+}
+
+async function doSearch(query) {
+  const resultsEl = document.getElementById('searchResults');
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&q=${encodeURIComponent(query + ', Gurgaon, India')}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.length) {
+      // Try without restricting to Gurgaon
+      const url2 = `https://nominatim.openstreetmap.org/search?format=json&limit=6&q=${encodeURIComponent(query + ', India')}`;
+      const res2 = await fetch(url2);
+      const data2 = await res2.json();
+      renderSearchResults(data2);
+      return;
+    }
+    renderSearchResults(data);
+  } catch (e) {
+    resultsEl.innerHTML = '<div class="search-result-item">Search failed</div>';
+    resultsEl.className = 'search-results visible';
+  }
+}
+
+function renderSearchResults(results) {
+  const resultsEl = document.getElementById('searchResults');
+  if (!results.length) {
+    resultsEl.innerHTML = '<div class="search-result-item">No results found</div>';
+    resultsEl.className = 'search-results visible';
+    return;
+  }
+  resultsEl.innerHTML = results.map((r, i) => {
+    const parts = r.display_name.split(', ');
+    const name = parts[0];
+    const addr = parts.slice(1, 4).join(', ');
+    return `<div class="search-result-item" onclick="selectSearchResult(${r.lat}, ${r.lon}, '${name.replace(/'/g, "\\'")}')">
+      <div class="result-name">${name}</div>
+      <div class="result-addr">${addr}</div>
+    </div>`;
+  }).join('');
+  resultsEl.className = 'search-results visible';
+}
+
+function selectSearchResult(lat, lon, name) {
+  // Hide results
+  document.getElementById('searchResults').className = 'search-results';
+  document.getElementById('searchInput').value = name;
+
+  // Remove old search marker
+  if (searchMarker) map.removeLayer(searchMarker);
+
+  // Add marker at searched location
+  searchMarker = L.marker([lat, lon]).addTo(map);
+  searchMarker.bindPopup(`<b>${name}</b><br><small>${lat.toFixed(5)}, ${lon.toFixed(5)}</small><br><br><em>Loading nearest profile...</em>`).openPopup();
+
+  // Fly to location
+  map.flyTo([lat, lon], 15, { duration: 1.2 });
+
+  // Fetch nearest profile
+  fetchProfileFor(lat, lon, name);
+}
+
+async function fetchProfileFor(lat, lon, name) {
+  try {
+    const data = await api('GET', `/profile?lat=${lat}&lon=${lon}`);
+    const audience = data.audience || {};
+    const ageProfile = audience.age_profile || {};
+    const interests = audience.interests || {};
+    const counts = (data.poi_summary || {}).counts || {};
+
+    let html = `<div class="profile-popup">
+      <h3>${name}</h3>
+      <div class="section" style="color:#888;font-size:11px">Nearest grid: ${data.grid_point_id} (${data.lat.toFixed(5)}, ${data.lon.toFixed(5)})</div>
+      <div class="section"><b>Geo:</b> ${(data.geographic_attributes || []).join(', ') || 'none'}</div>
+      <div class="section"><b>Confidence:</b> ${audience.confidence || 0} &nbsp; <b>Footfall:</b> ${audience.footfall_proxy || 0}</div>
+      <div class="section"><b>Age Profile</b>`;
+    for (const [bucket, val] of Object.entries(ageProfile)) {
+      const pct = Math.round(val * 100);
+      html += `<div class="bar-row">
+        <span class="bar-label">${bucket}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:#7c83ff"></div></div>
+        <span class="bar-val">${pct}%</span>
+      </div>`;
+    }
+    html += `</div><div class="section"><b>Interests</b>`;
+    for (const [cat, val] of Object.entries(interests)) {
+      const pct = Math.round(val * 100);
+      const iColor = INTEREST_COLORS[cat] || '#888';
+      html += `<div class="bar-row">
+        <span class="bar-label">${cat}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${iColor}"></div></div>
+        <span class="bar-val">${pct}%</span>
+      </div>`;
+    }
+    html += `</div>`;
+    if (Object.keys(counts).length) {
+      html += `<div class="section"><b>Nearby POIs</b><br>`;
+      for (const [t, c] of Object.entries(counts)) {
+        html += `${t}: ${c} &nbsp; `;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+
+    if (searchMarker) {
+      searchMarker.setPopupContent(html);
+      searchMarker.openPopup();
+    }
+  } catch (e) {
+    if (searchMarker) {
+      searchMarker.setPopupContent(`<b>${name}</b><br><small>No profile available for this location</small>`);
+    }
+  }
+}
+
+// Close search results when clicking elsewhere
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-box')) {
+    document.getElementById('searchResults').className = 'search-results';
+  }
+});
+
+// Hide write buttons in production (writes are local-only)
+if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+  document.querySelectorAll('button').forEach(btn => {
+    const text = btn.textContent;
+    if (text.includes('Generate') || text.includes('Collect') || text.includes('Compute') || text.includes('Force')) {
+      btn.style.display = 'none';
+    }
+  });
+}
+
+// Initial load
+doRefreshAll().catch(() => {});
+</script>
+</body>
+</html>
