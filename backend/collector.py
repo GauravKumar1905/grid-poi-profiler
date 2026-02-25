@@ -57,6 +57,7 @@ KEYWORD_TO_TYPE: dict[str, str] = {
     "IT park": "it_park",
     "residential apartment": "residential",
     "housing society": "residential",
+    "hotel": "hotel",
 }
 
 

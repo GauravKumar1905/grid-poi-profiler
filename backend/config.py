@@ -58,6 +58,7 @@ POI_KEYWORDS = [
     "IT park",
     "residential apartment",
     "housing society",
+    "hotel",
 ]
 
 # --- Type → attribute weight mappings ---
@@ -79,6 +80,7 @@ TYPE_TO_AGE_WEIGHTS: dict[str, dict[str, float]] = {
     "night_club":      {"18-24": 0.45, "25-34": 0.40, "35-50": 0.10, "13-17": 0.05},
     "place_of_worship": {"35-50": 0.30, "50+": 0.35, "25-34": 0.15, "0-12": 0.10, "13-17": 0.05, "18-24": 0.05},
     "lodging":         {"25-34": 0.35, "35-50": 0.35, "18-24": 0.15, "50+": 0.15},
+    "hotel":           {"25-34": 0.35, "35-50": 0.35, "18-24": 0.15, "50+": 0.15},
     "corporate_office": {"25-34": 0.45, "35-50": 0.35, "18-24": 0.15, "50+": 0.05},
     "coworking_space":  {"18-24": 0.25, "25-34": 0.50, "35-50": 0.20, "13-17": 0.05},
     "it_park":         {"25-34": 0.50, "35-50": 0.30, "18-24": 0.15, "50+": 0.05},
@@ -102,6 +104,7 @@ TYPE_TO_INTEREST_WEIGHTS: dict[str, dict[str, float]] = {
     "night_club":      {"entertainment": 1.0},
     "place_of_worship": {"lifestyle": 1.0},
     "lodging":         {"business": 0.5, "lifestyle": 0.5},
+    "hotel":           {"business": 0.5, "lifestyle": 0.3, "food": 0.2},
     "corporate_office": {"business": 1.0},
     "coworking_space":  {"business": 0.9, "lifestyle": 0.1},
     "it_park":         {"business": 1.0},
@@ -124,6 +127,7 @@ TYPE_TO_LANDUSE: dict[str, str] = {
     "night_club": "entertainment",
     "place_of_worship": "residential",
     "lodging": "hospitality",
+    "hotel": "hospitality",
     "corporate_office": "office",
     "coworking_space": "office",
     "it_park": "office",
@@ -146,6 +150,7 @@ TYPE_IMPORTANCE: dict[str, float] = {
     "night_club": 0.8,
     "place_of_worship": 0.9,
     "lodging": 1.0,
+    "hotel": 1.2,
     "corporate_office": 1.6,
     "coworking_space": 1.4,
     "it_park": 1.7,

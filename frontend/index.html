@@ -97,6 +97,48 @@
   .search-result-item:hover { background: #2a2a4a; color: #fff; }
   .search-result-item .result-name { font-weight: 600; color: #c0c4ff; }
   .search-result-item .result-addr { color: #888; font-size: 11px; margin-top: 2px; }
+
+  /* Filter section */
+  .filter-section { margin-top: 16px; border-top: 1px solid #2a2a4a; padding-top: 14px; }
+  .filter-section h3 {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: #666; margin-bottom: 8px;
+  }
+  .age-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+  .age-pill {
+    padding: 3px 9px; border-radius: 12px; font-size: 11px; cursor: pointer;
+    border: 1px solid #3a3a6a; background: #12122a; color: #aaa;
+    transition: all 0.15s;
+  }
+  .age-pill.active { background: #7c83ff; color: #fff; border-color: #7c83ff; }
+  .age-gradient-legend {
+    display: none; margin-bottom: 10px;
+  }
+  .age-gradient-legend .grad-bar {
+    height: 8px; border-radius: 4px;
+    background: linear-gradient(to right, hsl(240,80%,55%), hsl(120,75%,40%), hsl(60,90%,50%), hsl(0,85%,52%));
+  }
+  .age-gradient-legend .grad-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: #666; margin-top: 3px;
+  }
+  .poi-filter-actions { display: flex; gap: 6px; margin-bottom: 6px; }
+  .poi-filter-actions button {
+    flex: 1; padding: 4px 0; font-size: 11px; background: #12122a;
+    color: #888; border: 1px solid #2a2a4a; border-radius: 4px; cursor: pointer;
+  }
+  .poi-filter-actions button:hover { color: #ccc; background: #2a2a4a; }
+  .poi-type-list {
+    max-height: 130px; overflow-y: auto; display: grid;
+    grid-template-columns: 1fr 1fr; gap: 3px 6px;
+    padding-right: 2px;
+  }
+  .poi-type-list label {
+    font-size: 11px; color: #aaa; display: flex; align-items: center;
+    gap: 5px; cursor: pointer; white-space: nowrap; overflow: hidden;
+  }
+  .poi-type-list input[type=checkbox] { accent-color: #7c83ff; flex-shrink: 0; }
+  .type-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -132,6 +174,33 @@
     <label><input type="checkbox" id="toggleProfiles" checked onchange="toggleLayer('profiles')"> Profile Circles</label>
   </div>
 
+  <!-- ── FILTERS ── -->
+  <div class="filter-section">
+    <h3>Age Range — Profile Heatmap</h3>
+    <div class="age-pills" id="agePills">
+      <button class="age-pill active" data-age="" onclick="onAgeFilter(this)">All</button>
+      <button class="age-pill" data-age="0-12"  onclick="onAgeFilter(this)">0–12</button>
+      <button class="age-pill" data-age="13-17" onclick="onAgeFilter(this)">13–17</button>
+      <button class="age-pill" data-age="18-24" onclick="onAgeFilter(this)">18–24</button>
+      <button class="age-pill" data-age="25-34" onclick="onAgeFilter(this)">25–34</button>
+      <button class="age-pill" data-age="35-50" onclick="onAgeFilter(this)">35–50</button>
+      <button class="age-pill" data-age="50+"   onclick="onAgeFilter(this)">50+</button>
+    </div>
+    <div class="age-gradient-legend" id="ageLegend">
+      <div class="grad-bar"></div>
+      <div class="grad-labels"><span>Low score</span><span>High score</span></div>
+    </div>
+
+    <h3>POI Type Filter</h3>
+    <div class="poi-filter-actions">
+      <button onclick="setAllPoiTypes(true)">Select all</button>
+      <button onclick="setAllPoiTypes(false)">Clear all</button>
+    </div>
+    <div class="poi-type-list" id="poiTypeList">
+      <span style="color:#555;font-size:11px">Load POIs to populate…</span>
+    </div>
+  </div>
+
   <div class="legend">
     <div class="legend-item"><div class="legend-dot" style="background:#ff6b6b"></div> Hospital/Health</div>
     <div class="legend-item"><div class="legend-dot" style="background:#ffd93d"></div> School/Education</div>
@@ -143,6 +212,7 @@
     <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div> Entertainment</div>
     <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div> Lifestyle/Worship</div>
     <div class="legend-item"><div class="legend-dot" style="background:#94a3b8"></div> Lodging</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Hotel</div>
     <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div> Residential</div>
   </div>
 </div>
@@ -179,7 +249,7 @@ const POI_COLORS = {
   transit_station: '#4d96ff',
   park: '#10b981', gym: '#10b981',
   movie_theater: '#c084fc', bar: '#c084fc', night_club: '#c084fc',
-  place_of_worship: '#f472b6', lodging: '#94a3b8',
+  place_of_worship: '#f472b6', lodging: '#94a3b8', hotel: '#f59e0b',
   corporate_office: '#3b82f6', coworking_space: '#3b82f6', it_park: '#3b82f6',
   residential: '#a78bfa',
 };
@@ -203,6 +273,59 @@ let allPois = [];
 let allProfiles = [];
 let profileMap = {};  // grid_point_id -> profile
 let gpMap = {};       // grid_point_id -> grid_point
+
+// ---- Filter State ----
+const hiddenPoiTypes = new Set();   // types whose markers are hidden
+let activeAgeRange = '';            // '' = default geo-attr coloring
+
+function onAgeFilter(btn) {
+  document.querySelectorAll('#agePills .age-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeAgeRange = btn.dataset.age;
+  document.getElementById('ageLegend').style.display = activeAgeRange ? 'block' : 'none';
+  renderViewportProfiles();
+}
+
+function buildPoiTypeList() {
+  const types = new Set();
+  allPois.forEach(poi => {
+    (poi.types || []).forEach(t => { if (POI_COLORS[t]) types.add(t); });
+  });
+  const container = document.getElementById('poiTypeList');
+  container.innerHTML = '';
+  [...types].sort().forEach(t => {
+    const color = POI_COLORS[t] || '#888';
+    const label = document.createElement('label');
+    label.title = t;
+    label.innerHTML =
+      `<input type="checkbox" value="${t}" ${hiddenPoiTypes.has(t) ? '' : 'checked'}
+         onchange="onPoiTypeToggle(this)">` +
+      `<span class="type-dot" style="background:${color}"></span>` +
+      `<span style="overflow:hidden;text-overflow:ellipsis">${t.replace(/_/g, ' ')}</span>`;
+    container.appendChild(label);
+  });
+}
+
+function onPoiTypeToggle(cb) {
+  if (!cb.checked) hiddenPoiTypes.add(cb.value);
+  else hiddenPoiTypes.delete(cb.value);
+  renderPois();
+}
+
+function setAllPoiTypes(checked) {
+  document.querySelectorAll('#poiTypeList input[type=checkbox]').forEach(cb => {
+    cb.checked = checked;
+    if (!checked) hiddenPoiTypes.add(cb.value);
+    else hiddenPoiTypes.delete(cb.value);
+  });
+  renderPois();
+}
+
+/** Blue → Green → Yellow → Red based on 0–1 score */
+function ageScoreColor(score) {
+  const h = Math.round(240 - score * 240);
+  return `hsl(${h}, 85%, 52%)`;
+}
 
 function setStatus(msg, type) {
   const el = document.getElementById('status');
@@ -296,6 +419,7 @@ async function loadPois() {
   const data = await api('GET', '/pois');
   allPois = data.pois;
   document.getElementById('stat-pois').textContent = data.count;
+  buildPoiTypeList();
   renderPois();
 }
 
@@ -315,6 +439,7 @@ function renderPois() {
   const markers = [];
   allPois.forEach(poi => {
     const ptype = (poi.types || []).find(t => POI_COLORS[t]) || 'other';
+    if (hiddenPoiTypes.has(ptype)) return;
     const color = POI_COLORS[ptype] || '#888';
     const marker = L.circleMarker([poi.lat, poi.lon], {
       radius: 6, color, fillColor: color, fillOpacity: 0.85, weight: 1,
@@ -379,12 +504,21 @@ function renderViewportProfiles() {
     if (!gp) return;
     if (!bounds.contains([gp.lat, gp.lon])) return;
 
-    const attrs = p.geo_attrs || [];
-    const dominant = attrs[0] || 'other';
-    const color = ATTR_COLORS[dominant] || '#888';
+    let color, fillOpacity;
+    if (activeAgeRange) {
+      const score = (p.audience?.age_profile || {})[activeAgeRange] || 0;
+      if (score < 0.04) return;   // hide negligible grid points
+      color = ageScoreColor(score);
+      fillOpacity = 0.15 + score * 0.55;
+    } else {
+      const attrs = p.geo_attrs || [];
+      const dominant = attrs[0] || 'other';
+      color = ATTR_COLORS[dominant] || '#888';
+      fillOpacity = 0.2;
+    }
 
     L.circle([gp.lat, gp.lon], {
-      radius: 100, color, fillColor: color, fillOpacity: 0.2, weight: 1.5,
+      radius: 100, color, fillColor: color, fillOpacity, weight: 1.5,
     }).bindPopup(buildProfilePopup(p), { maxWidth: 400 }).addTo(profilesLayer);
     visible++;
   });
