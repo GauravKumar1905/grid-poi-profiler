@@ -201,6 +201,5 @@ def compute_all_profiles() -> int:
 
 
 def _flush_batch(batch: list[tuple[str, dict, dict, dict]]) -> None:
-    """Write a batch of profiles to the database."""
-    for gp_id, geo_attrs, audience, poi_summary in batch:
-        db.upsert_profile(gp_id, geo_attrs=geo_attrs, audience=audience, poi_summary=poi_summary)
+    """Write a batch of profiles to the database in one round of writes."""
+    db.upsert_profiles(batch)

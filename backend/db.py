@@ -91,11 +91,10 @@ def init_db() -> None:
 
 def upsert_grid_points(points: list[dict]) -> None:
     conn = get_conn()
-    for p in points:
-        conn.execute(
-            "INSERT OR REPLACE INTO grid_points (id, i, j, lat, lon) VALUES (?, ?, ?, ?, ?)",
-            (p["id"], p["i"], p["j"], p["lat"], p["lon"]),
-        )
+    conn.executemany(
+        "INSERT OR REPLACE INTO grid_points (id, i, j, lat, lon) VALUES (?, ?, ?, ?, ?)",
+        [(p["id"], p["i"], p["j"], p["lat"], p["lon"]) for p in points],
+    )
     conn.commit()
     if TURSO_DATABASE_URL:
         conn.sync()
@@ -154,21 +153,29 @@ def get_all_pois() -> list[dict]:
 
 # ---- Profiles ----
 
+_UPSERT_PROFILE_SQL = """INSERT OR REPLACE INTO profiles
+   (grid_point_id, geo_attrs, audience, poi_summary, last_updated, version)
+   VALUES (?, ?, ?, ?, ?, COALESCE((SELECT version FROM profiles WHERE grid_point_id = ?), 0) + 1)"""
+
+
 def upsert_profile(grid_point_id: str, geo_attrs: dict, audience: dict, poi_summary: dict) -> None:
-    conn = get_conn()
+    upsert_profiles([(grid_point_id, geo_attrs, audience, poi_summary)])
+
+
+def upsert_profiles(rows: list[tuple[str, dict, dict, dict]]) -> None:
+    """Write many profiles over one connection, one commit and one sync.
+
+    rows: (grid_point_id, geo_attrs, audience, poi_summary) tuples.
+    """
     from datetime import datetime, timezone
-    conn.execute(
-        """INSERT OR REPLACE INTO profiles
-           (grid_point_id, geo_attrs, audience, poi_summary, last_updated, version)
-           VALUES (?, ?, ?, ?, ?, COALESCE((SELECT version FROM profiles WHERE grid_point_id = ?), 0) + 1)""",
-        (
-            grid_point_id,
-            json.dumps(geo_attrs),
-            json.dumps(audience),
-            json.dumps(poi_summary),
-            datetime.now(timezone.utc).isoformat(),
-            grid_point_id,
-        ),
+    now = datetime.now(timezone.utc).isoformat()
+    conn = get_conn()
+    conn.executemany(
+        _UPSERT_PROFILE_SQL,
+        [
+            (gp_id, json.dumps(geo_attrs), json.dumps(audience), json.dumps(poi_summary), now, gp_id)
+            for gp_id, geo_attrs, audience, poi_summary in rows
+        ],
     )
     conn.commit()
     if TURSO_DATABASE_URL:
