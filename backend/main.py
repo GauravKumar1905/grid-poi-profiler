@@ -103,7 +103,7 @@ async def get_grid(request: Request):
 
 
 @app.post("/grid/generate", dependencies=[Depends(verify_admin)])
-async def generate_grid_endpoint(force: bool = Query(False, description="Delete the grid and its profiles, then regenerate")):
+def generate_grid_endpoint(force: bool = Query(False, description="Delete the grid and its profiles, then regenerate")):
     existing = db.get_all_grid_points()
     if existing and not force:
         return {"message": f"Grid already exists with {len(existing)} points. Use ?force=true to regenerate.", "count": len(existing), "cached": True}
@@ -166,7 +166,7 @@ async def collect_pois_endpoint(force: bool = Query(False, description="Force re
 
 
 @app.post("/collect/mock", dependencies=[Depends(verify_admin)])
-async def collect_mock_pois_endpoint():
+def collect_mock_pois_endpoint():
     count = load_mock_pois()
     _invalidate_cache()
     return {"message": f"Loaded {count} mock POIs", "count": count}
@@ -260,7 +260,7 @@ async def get_profile_by_id(grid_point_id: str):
 
 
 @app.post("/compute-profiles", dependencies=[Depends(verify_admin)])
-async def compute_profiles_endpoint():
+def compute_profiles_endpoint():
     count = compute_all_profiles()
     _invalidate_cache()
     return {"message": f"Computed {count} profiles", "count": count}
