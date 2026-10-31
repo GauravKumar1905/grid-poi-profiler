@@ -7,6 +7,7 @@ Supports two modes:
 
 import json
 import os
+import threading
 from pathlib import Path
 import libsql_experimental as libsql
 
@@ -15,14 +16,20 @@ TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "")
 DB_PATH = Path(os.getenv("DB_PATH", "grid.db"))  # local mode only; tests override it
 
 
+# Serialises opening + syncing the shared local replica file, so two requests
+# (or startup and a request) never sync it at the same time.
+_replica_lock = threading.Lock()
+
+
 def get_conn():
     if TURSO_DATABASE_URL:
-        conn = libsql.connect(
-            "local.db",
-            sync_url=TURSO_DATABASE_URL,
-            auth_token=TURSO_AUTH_TOKEN,
-        )
-        conn.sync()
+        with _replica_lock:
+            conn = libsql.connect(
+                "local.db",
+                sync_url=TURSO_DATABASE_URL,
+                auth_token=TURSO_AUTH_TOKEN,
+            )
+            conn.sync()
     else:
         conn = libsql.connect(str(DB_PATH))
     return conn
