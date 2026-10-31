@@ -63,10 +63,12 @@ async def get_grid():
 
 
 @app.post("/grid/generate", dependencies=[Depends(verify_admin)])
-async def generate_grid_endpoint():
+async def generate_grid_endpoint(force: bool = Query(False, description="Delete the grid and its profiles, then regenerate")):
     existing = db.get_all_grid_points()
+    if existing and not force:
+        return {"message": f"Grid already exists with {len(existing)} points. Use ?force=true to regenerate.", "count": len(existing), "cached": True}
     if existing:
-        return {"message": f"Grid already exists with {len(existing)} points.", "count": len(existing), "cached": True}
+        db.clear_grid()
     points = generate_grid_from_bbox(
         config.BBOX_SOUTH, config.BBOX_NORTH,
         config.BBOX_WEST, config.BBOX_EAST,
@@ -153,6 +155,7 @@ async def get_config():
             "west": config.BBOX_WEST, "east": config.BBOX_EAST,
         },
         "grid_spacing_m": config.GRID_SPACING_M,
+        "grid_layout": "hex",
         "sigma_m": config.SIGMA_M,
         "max_influence_m": config.MAX_INFLUENCE_M,
         "search_radius_m": config.SEARCH_RADIUS_M,

@@ -11,6 +11,10 @@ from fastapi.testclient import TestClient
 import db as db_module
 db_module.DB_PATH = Path(__file__).parent / "test_grid.db"
 
+# Never let tests reach the real (billed) Google Places API
+import config
+config.GOOGLE_MAPS_API_KEY = ""
+
 from main import app
 
 client = TestClient(app)

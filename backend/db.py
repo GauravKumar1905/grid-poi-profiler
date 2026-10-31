@@ -7,10 +7,12 @@ Supports two modes:
 
 import json
 import os
+from pathlib import Path
 import libsql_experimental as libsql
 
 TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "")
 TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "")
+DB_PATH = Path(os.getenv("DB_PATH", "grid.db"))  # local mode only; tests override it
 
 
 def get_conn():
@@ -22,7 +24,7 @@ def get_conn():
         )
         conn.sync()
     else:
-        conn = libsql.connect("grid.db")
+        conn = libsql.connect(str(DB_PATH))
     return conn
 
 
@@ -94,6 +96,17 @@ def upsert_grid_points(points: list[dict]) -> None:
             "INSERT OR REPLACE INTO grid_points (id, i, j, lat, lon) VALUES (?, ?, ?, ?, ?)",
             (p["id"], p["i"], p["j"], p["lat"], p["lon"]),
         )
+    conn.commit()
+    if TURSO_DATABASE_URL:
+        conn.sync()
+    conn.close()
+
+
+def clear_grid() -> None:
+    """Delete all grid points and the profiles that reference them."""
+    conn = get_conn()
+    conn.execute("DELETE FROM profiles")
+    conn.execute("DELETE FROM grid_points")
     conn.commit()
     if TURSO_DATABASE_URL:
         conn.sync()
