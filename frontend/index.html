@@ -171,7 +171,7 @@
 
   <div class="layer-toggle">
     <label><input type="checkbox" id="togglePois" checked onchange="toggleLayer('pois')"> POI Markers (clustered)</label>
-    <label><input type="checkbox" id="toggleProfiles" checked onchange="toggleLayer('profiles')"> Profile Circles</label>
+    <label><input type="checkbox" id="toggleProfiles" checked onchange="toggleLayer('profiles')"> Profile Hexagons</label>
   </div>
 
   <!-- ── FILTERS ── -->
@@ -198,6 +198,12 @@
     </div>
     <div class="poi-type-list" id="poiTypeList">
       <span style="color:#555;font-size:11px">Load POIs to populate…</span>
+    </div>
+    <div class="layer-toggle" style="margin-top:10px">
+      <label title="Hide hexagons that contain no POI of the checked types">
+        <input type="checkbox" id="filterHexByType" onchange="renderViewportProfiles()">
+        Only show hexagons containing checked types
+      </label>
     </div>
   </div>
 
@@ -273,6 +279,76 @@ let allPois = [];
 let allProfiles = [];
 let profileMap = {};  // grid_point_id -> profile
 let gpMap = {};       // grid_point_id -> grid_point
+let cellPoiCounts = {};  // grid_point_id -> {poi_type: count} for POIs inside that hexagon
+
+// ---- Hex geometry ----
+// Pointy-top hexagons on the backend's lattice; filled in from /config on load.
+const EARTH_R = 6378137;
+let hexSpacingM = 200;
+let hexOriginLat = 28.35;
+let hexOffsets = [];  // [dLat, dLon] for each of the 6 vertices
+
+function buildHexOffsets() {
+  const circumradius = hexSpacingM / Math.sqrt(3);
+  const cosLat = Math.cos(hexOriginLat * Math.PI / 180);
+  hexOffsets = [];
+  for (let k = 0; k < 6; k++) {
+    const theta = (30 + 60 * k) * Math.PI / 180;
+    const dx = circumradius * Math.cos(theta);
+    const dy = circumradius * Math.sin(theta);
+    hexOffsets.push([
+      (dy / EARTH_R) * 180 / Math.PI,
+      (dx / (EARTH_R * cosLat)) * 180 / Math.PI,
+    ]);
+  }
+}
+buildHexOffsets();
+
+function hexVertices(gp) {
+  return hexOffsets.map(([dLat, dLon]) => [gp.lat + dLat, gp.lon + dLon]);
+}
+
+function poiPrimaryType(poi) {
+  return (poi.types || []).find(t => POI_COLORS[t]) || 'other';
+}
+
+/** Put each POI in the hexagon that contains it (= nearest cell centre). */
+function assignPoisToCells() {
+  cellPoiCounts = {};
+  if (!allGridPoints.length || !allPois.length) return;
+
+  // Buckets larger than a cell, so the containing cell is always in the 3x3 neighbourhood
+  const B = 0.002;
+  const buckets = new Map();
+  allGridPoints.forEach(gp => {
+    const key = Math.floor(gp.lat / B) + ':' + Math.floor(gp.lon / B);
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(gp);
+  });
+
+  const cosLat = Math.cos(hexOriginLat * Math.PI / 180);
+  const maxD2 = (hexSpacingM / Math.sqrt(3)) ** 2 * 1.05;
+  allPois.forEach(poi => {
+    const bi = Math.floor(poi.lat / B), bj = Math.floor(poi.lon / B);
+    let best = null, bestD2 = Infinity;
+    for (let a = -1; a <= 1; a++) {
+      for (let b = -1; b <= 1; b++) {
+        const cell = buckets.get((bi + a) + ':' + (bj + b));
+        if (!cell) continue;
+        cell.forEach(gp => {
+          const dy = (poi.lat - gp.lat) * Math.PI / 180 * EARTH_R;
+          const dx = (poi.lon - gp.lon) * Math.PI / 180 * EARTH_R * cosLat;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < bestD2) { bestD2 = d2; best = gp; }
+        });
+      }
+    }
+    if (!best || bestD2 > maxD2) return;  // outside the grid
+    const counts = cellPoiCounts[best.id] || (cellPoiCounts[best.id] = {});
+    const ptype = poiPrimaryType(poi);
+    counts[ptype] = (counts[ptype] || 0) + 1;
+  });
+}
 
 // ---- Filter State ----
 const hiddenPoiTypes = new Set();   // types whose markers are hidden
@@ -310,6 +386,7 @@ function onPoiTypeToggle(cb) {
   if (!cb.checked) hiddenPoiTypes.add(cb.value);
   else hiddenPoiTypes.delete(cb.value);
   renderPois();
+  renderViewportProfiles();
 }
 
 function setAllPoiTypes(checked) {
@@ -319,6 +396,18 @@ function setAllPoiTypes(checked) {
     else hiddenPoiTypes.delete(cb.value);
   });
   renderPois();
+  renderViewportProfiles();
+}
+
+/** Count of POIs inside the hexagon whose type is currently checked. */
+function matchingPoisInCell(gpId) {
+  const counts = cellPoiCounts[gpId] || {};
+  let n = 0;
+  for (const [t, c] of Object.entries(counts)) {
+    // 'other' has no checkbox, so it never counts as a match
+    if (t !== 'other' && !hiddenPoiTypes.has(t)) n += c;
+  }
+  return n;
 }
 
 /** Blue → Green → Yellow → Red based on 0–1 score */
@@ -397,8 +486,16 @@ async function doCompute() {
   await loadProfiles();
 }
 
+async function loadConfig() {
+  const cfg = await api('GET', '/config');
+  hexSpacingM = cfg.grid_spacing_m;
+  hexOriginLat = cfg.bbox.south;
+  buildHexOffsets();
+}
+
 async function doRefreshAll() {
   setStatus('Loading data...', 'info');
+  await loadConfig();
   await loadGrid();
   await loadPois();
   await loadProfiles();
@@ -413,12 +510,14 @@ async function loadGrid() {
   gpMap = {};
   allGridPoints.forEach(gp => { gpMap[gp.id] = gp; });
   document.getElementById('stat-grid').textContent = data.count;
+  assignPoisToCells();
 }
 
 async function loadPois() {
   const data = await api('GET', '/pois');
   allPois = data.pois;
   document.getElementById('stat-pois').textContent = data.count;
+  assignPoisToCells();
   buildPoiTypeList();
   renderPois();
 }
@@ -438,7 +537,7 @@ function renderPois() {
   poiCluster.clearLayers();
   const markers = [];
   allPois.forEach(poi => {
-    const ptype = (poi.types || []).find(t => POI_COLORS[t]) || 'other';
+    const ptype = poiPrimaryType(poi);
     if (hiddenPoiTypes.has(ptype)) return;
     const color = POI_COLORS[ptype] || '#888';
     const marker = L.circleMarker([poi.lat, poi.lon], {
@@ -456,10 +555,14 @@ function buildProfilePopup(p) {
   const ageProfile = audience.age_profile || {};
   const interests = audience.interests || {};
   const counts = (p.poi_summary || {}).counts || {};
+  const inCell = cellPoiCounts[p.grid_point_id] || {};
 
   let html = `<div class="profile-popup">
     <h3>${p.grid_point_id}</h3>
     <div class="section"><b>Geo:</b> ${attrs.join(', ') || 'none'}</div>
+    <div class="section"><b>Inside this hexagon:</b> ${
+      Object.entries(inCell).map(([t, c]) => `${t.replace(/_/g, ' ')}: ${c}`).join(', ') || 'no POIs'
+    }</div>
     <div class="section"><b>Confidence:</b> ${audience.confidence || 0} &nbsp; <b>Footfall:</b> ${audience.footfall_proxy || 0}</div>
     <div class="section"><b>Age Profile</b>`;
   for (const [bucket, val] of Object.entries(ageProfile)) {
@@ -482,7 +585,7 @@ function buildProfilePopup(p) {
   }
   html += `</div>`;
   if (Object.keys(counts).length) {
-    html += `<div class="section"><b>Nearby POIs</b><br>`;
+    html += `<div class="section"><b>Nearby POIs (within 1 km)</b><br>`;
     for (const [t, c] of Object.entries(counts)) {
       html += `${t}: ${c} &nbsp; `;
     }
@@ -497,12 +600,14 @@ function renderViewportProfiles() {
   if (!allProfiles.length) return;
 
   const bounds = map.getBounds();
+  const filterByType = document.getElementById('filterHexByType').checked;
   let visible = 0;
 
   allProfiles.forEach(p => {
     const gp = gpMap[p.grid_point_id];
     if (!gp) return;
     if (!bounds.contains([gp.lat, gp.lon])) return;
+    if (filterByType && !matchingPoisInCell(gp.id)) return;
 
     let color, fillOpacity;
     if (activeAgeRange) {
@@ -517,8 +622,8 @@ function renderViewportProfiles() {
       fillOpacity = 0.2;
     }
 
-    L.circle([gp.lat, gp.lon], {
-      radius: 100, color, fillColor: color, fillOpacity, weight: 1.5,
+    L.polygon(hexVertices(gp), {
+      color, fillColor: color, fillOpacity, weight: 1,
     }).bindPopup(buildProfilePopup(p), { maxWidth: 400 }).addTo(profilesLayer);
     visible++;
   });

@@ -1,4 +1,10 @@
-"""Grid generation: 200 m square grid from GPS bounding box."""
+"""Grid generation: 200 m hexagonal grid from GPS bounding box.
+
+Hex lattice uses pointy-top cells: neighbouring centres are `spacing_m` apart,
+rows are `spacing_m * sqrt(3) / 2` apart and odd rows shift east by half a cell.
+Each cell's circumradius is `spacing_m / sqrt(3)`, so the cells tile the plane
+and the nearest centre to any point is the cell that contains it.
+"""
 
 import math
 from dataclasses import dataclass
@@ -54,6 +60,30 @@ def generate_grid(
     return points
 
 
+def generate_hex_grid(
+    origin_lat: float,
+    origin_lon: float,
+    size_x: int,
+    size_y: int,
+    spacing_m: float = 200.0,
+) -> list[GridPoint]:
+    """Generate a hexagonal lattice of cell centres (pointy-top, odd rows offset).
+
+    origin is the south-west corner.
+    size_x = number of cells per row, size_y = number of rows.
+    """
+    row_height = spacing_m * math.sqrt(3) / 2
+    points: list[GridPoint] = []
+    for j in range(size_y):
+        x_shift = spacing_m / 2 if j % 2 else 0.0
+        for i in range(size_x):
+            dx = i * spacing_m + x_shift
+            dy = j * row_height
+            lat, lon = offset_point(origin_lat, origin_lon, dx, dy)
+            points.append(GridPoint(id=f"g_{i}_{j}", i=i, j=j, lat=lat, lon=lon))
+    return points
+
+
 def generate_grid_from_bbox(
     south: float,
     north: float,
@@ -61,9 +91,9 @@ def generate_grid_from_bbox(
     east: float,
     spacing_m: float = 200.0,
 ) -> list[GridPoint]:
-    """Generate grid covering a lat/lon bounding box at the given spacing."""
+    """Generate a hex grid covering a lat/lon bounding box at the given spacing."""
     width_m = haversine(south, west, south, east)
     height_m = haversine(south, west, north, west)
     size_x = int(width_m / spacing_m) + 1
-    size_y = int(height_m / spacing_m) + 1
-    return generate_grid(south, west, size_x, size_y, spacing_m)
+    size_y = int(height_m / (spacing_m * math.sqrt(3) / 2)) + 1
+    return generate_hex_grid(south, west, size_x, size_y, spacing_m)
