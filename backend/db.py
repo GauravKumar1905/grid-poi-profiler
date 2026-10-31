@@ -87,13 +87,32 @@ def init_db() -> None:
     conn.close()
 
 
+def _insert_rows(conn, head: str, row_sql: str, rows: list[tuple], rows_per_statement: int) -> None:
+    """Run `head VALUES row_sql, row_sql, ...` with many rows per statement.
+
+    With Turso every statement is a network round trip (executemany still sends
+    one per row), so packing rows into multi-row INSERTs is what makes bulk
+    writes fast. Keep rows_per_statement * params-per-row well under SQLite's
+    32,766 bound-parameter limit.
+    """
+    for start in range(0, len(rows), rows_per_statement):
+        chunk = rows[start:start + rows_per_statement]
+        conn.execute(
+            f"{head} VALUES " + ", ".join([row_sql] * len(chunk)),
+            tuple(v for row in chunk for v in row),
+        )
+
+
 # ---- Grid points ----
 
 def upsert_grid_points(points: list[dict]) -> None:
     conn = get_conn()
-    conn.executemany(
-        "INSERT OR REPLACE INTO grid_points (id, i, j, lat, lon) VALUES (?, ?, ?, ?, ?)",
+    _insert_rows(
+        conn,
+        "INSERT OR REPLACE INTO grid_points (id, i, j, lat, lon)",
+        "(?, ?, ?, ?, ?)",
         [(p["id"], p["i"], p["j"], p["lat"], p["lon"]) for p in points],
+        rows_per_statement=500,
     )
     conn.commit()
     if TURSO_DATABASE_URL:
@@ -153,9 +172,9 @@ def get_all_pois() -> list[dict]:
 
 # ---- Profiles ----
 
-_UPSERT_PROFILE_SQL = """INSERT OR REPLACE INTO profiles
-   (grid_point_id, geo_attrs, audience, poi_summary, last_updated, version)
-   VALUES (?, ?, ?, ?, ?, COALESCE((SELECT version FROM profiles WHERE grid_point_id = ?), 0) + 1)"""
+_UPSERT_PROFILE_HEAD = """INSERT OR REPLACE INTO profiles
+   (grid_point_id, geo_attrs, audience, poi_summary, last_updated, version)"""
+_UPSERT_PROFILE_ROW = "(?, ?, ?, ?, ?, COALESCE((SELECT version FROM profiles WHERE grid_point_id = ?), 0) + 1)"
 
 
 def upsert_profile(grid_point_id: str, geo_attrs: dict, audience: dict, poi_summary: dict) -> None:
@@ -163,19 +182,22 @@ def upsert_profile(grid_point_id: str, geo_attrs: dict, audience: dict, poi_summ
 
 
 def upsert_profiles(rows: list[tuple[str, dict, dict, dict]]) -> None:
-    """Write many profiles over one connection, one commit and one sync.
+    """Write many profiles in multi-row statements over one connection, one commit and one sync.
 
     rows: (grid_point_id, geo_attrs, audience, poi_summary) tuples.
     """
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc).isoformat()
     conn = get_conn()
-    conn.executemany(
-        _UPSERT_PROFILE_SQL,
+    _insert_rows(
+        conn,
+        _UPSERT_PROFILE_HEAD,
+        _UPSERT_PROFILE_ROW,
         [
             (gp_id, json.dumps(geo_attrs), json.dumps(audience), json.dumps(poi_summary), now, gp_id)
             for gp_id, geo_attrs, audience, poi_summary in rows
         ],
+        rows_per_statement=100,  # profile rows carry ~1.5 KB of JSON each
     )
     conn.commit()
     if TURSO_DATABASE_URL:
