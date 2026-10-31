@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grid POI Profiler — Gurgaon</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f0f; color: #e0e0e0; }
@@ -17,59 +15,87 @@
     border-right: 1px solid #2a2a4a;
   }
   #sidebar h1 { font-size: 18px; color: #7c83ff; margin-bottom: 4px; }
-  #sidebar .subtitle { font-size: 12px; color: #888; margin-bottom: 20px; }
+  #sidebar .lede { font-size: 12px; color: #999; line-height: 1.5; margin-bottom: 14px; }
 
+  /* Sidebar sections */
+  .panel { border-top: 1px solid #2a2a4a; padding: 14px 0 12px; }
+  .panel h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: #9a9ab8; font-weight: 600; margin-bottom: 8px;
+  }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .link { background: none; border: none; color: #7c83ff; font-size: 12px; cursor: pointer; padding: 0; }
+  .link:hover { text-decoration: underline; }
+  .hint { font-size: 11px; color: #888; line-height: 1.5; margin-top: 8px; }
+
+  .seg { display: flex; background: #12122a; border: 1px solid #3a3a6a; border-radius: 8px; padding: 3px; }
+  .seg button {
+    flex: 1; padding: 7px 0; font-size: 12px; border: none; border-radius: 6px;
+    background: none; color: #aaa; cursor: pointer;
+  }
+  .seg button.active { background: #7c83ff; color: #fff; font-weight: 600; }
+
+  .check-row {
+    display: flex; align-items: center; gap: 8px; padding: 4px 0;
+    font-size: 12px; color: #ccc; cursor: pointer;
+  }
+  .check-row input[type=checkbox] { accent-color: #7c83ff; }
+  .check-row.emphasis {
+    margin-top: 10px; padding: 8px 10px; background: #12122a;
+    border: 1px solid #2a2a4a; border-radius: 6px; color: #e0e0e0;
+  }
+  .footer-stat { font-size: 12px; color: #999; padding: 10px 0; border-top: 1px solid #2a2a4a; }
+  .footer-stat b { color: #c0c4ff; }
+
+  /* Data setup (admin, local only) */
+  .admin { border-top: 1px solid #2a2a4a; padding-top: 10px; margin-top: 4px; }
+  .admin summary { font-size: 12px; color: #888; cursor: pointer; padding: 4px 0; }
+  .admin[open] summary { color: #c0c4ff; margin-bottom: 4px; }
   .btn {
-    display: block; width: 100%; padding: 10px 16px; margin-bottom: 8px;
+    display: block; width: 100%; padding: 8px 12px; margin-top: 8px;
     background: #2a2a4a; color: #c0c4ff; border: 1px solid #3a3a6a;
-    border-radius: 6px; cursor: pointer; font-size: 13px; text-align: left;
+    border-radius: 6px; cursor: pointer; font-size: 12px; text-align: left;
     transition: background 0.15s;
   }
   .btn:hover { background: #3a3a6a; }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn .icon { margin-right: 6px; }
-  .btn-sm { font-size: 11px; padding: 6px 16px; opacity: 0.7; }
-
-  .stats {
-    margin-top: 16px; padding: 12px; background: #12122a; border-radius: 6px;
-    font-size: 12px; line-height: 1.8;
-  }
-  .stats .label { color: #888; }
-  .stats .value { color: #7c83ff; font-weight: 600; }
+  .btn b { font-weight: 600; display: block; }
+  .btn span { font-size: 11px; color: #8f93c9; }
+  .btn-danger { border-color: #5a2a3a; color: #ff9a9a; }
+  .btn-danger span { color: #c98080; }
+  .stats { margin-top: 10px; font-size: 11px; color: #888; }
+  .stats b { color: #c0c4ff; }
 
   #status {
-    margin-top: 12px; padding: 10px; border-radius: 6px;
+    margin-top: 4px; margin-bottom: 8px; padding: 8px 10px; border-radius: 6px;
     font-size: 12px; display: none;
   }
   #status.info { display: block; background: #1a2a4a; color: #6cb4ff; }
   #status.success { display: block; background: #1a3a2a; color: #6cff9a; }
   #status.error { display: block; background: #3a1a1a; color: #ff6c6c; }
 
-  .layer-toggle { margin-top: 16px; }
-  .layer-toggle label {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 12px; color: #aaa; margin-bottom: 6px; cursor: pointer;
-  }
-  .layer-toggle input[type=checkbox] { accent-color: #7c83ff; }
-
-  .legend { margin-top: 16px; font-size: 11px; }
-  .legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
-
   #map { position: fixed; top: 0; left: 320px; right: 0; bottom: 0; }
 
   .profile-popup { max-width: 360px; max-height: 400px; overflow-y: auto; font-size: 12px; }
-  .profile-popup h3 { color: #333; margin-bottom: 8px; }
+  .profile-popup h3 { color: #333; margin-bottom: 2px; }
+  .profile-popup .muted { color: #888; font-size: 11px; margin-bottom: 8px; }
   .profile-popup .section { margin-bottom: 8px; }
   .profile-popup .bar-row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
   .profile-popup .bar-label { width: 60px; text-align: right; font-size: 11px; color: #666; }
   .profile-popup .bar-track { flex: 1; height: 14px; background: #eee; border-radius: 3px; overflow: hidden; }
   .profile-popup .bar-fill { height: 100%; border-radius: 3px; }
   .profile-popup .bar-val { width: 36px; font-size: 11px; color: #555; }
+  .profile-popup .chip { display: inline-flex; align-items: center; gap: 4px; margin: 0 8px 2px 0; }
+  .profile-popup .chip i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 
-  .leaflet-marker-icon.poi-dot {
-    border-radius: 50%; border: 1px solid rgba(0,0,0,0.3);
+  /* Neutral POI clusters, so they never read as a place-type colour */
+  .poi-cluster div {
+    width: 100%; height: 100%; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.92); color: #1a1a2e;
+    border: 1px solid rgba(26, 26, 46, 0.35); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    display: flex; align-items: center; justify-content: center;
+    font: 600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
+  .hex-tip { font-size: 12px; }
 
   /* Search box */
   .search-box { margin-bottom: 16px; position: relative; }
@@ -98,135 +124,118 @@
   .search-result-item .result-name { font-weight: 600; color: #c0c4ff; }
   .search-result-item .result-addr { color: #888; font-size: 11px; margin-top: 2px; }
 
-  /* Filter section */
-  .filter-section { margin-top: 16px; border-top: 1px solid #2a2a4a; padding-top: 14px; }
-  .filter-section h3 {
-    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
-    color: #666; margin-bottom: 8px;
-  }
-  .age-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+  /* Age group picker */
+  .age-pills { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }
   .age-pill {
     padding: 3px 9px; border-radius: 12px; font-size: 11px; cursor: pointer;
     border: 1px solid #3a3a6a; background: #12122a; color: #aaa;
     transition: all 0.15s;
   }
   .age-pill.active { background: #7c83ff; color: #fff; border-color: #7c83ff; }
-  .age-gradient-legend {
-    display: none; margin-bottom: 10px;
-  }
   .age-gradient-legend .grad-bar {
     height: 8px; border-radius: 4px;
-    background: linear-gradient(to right, hsl(240,80%,55%), hsl(120,75%,40%), hsl(60,90%,50%), hsl(0,85%,52%));
+    background: linear-gradient(to right, #cde2fb, #9ec5f4, #6da7ec, #3987e5, #256abf, #184f95, #0d366b);
   }
   .age-gradient-legend .grad-labels {
     display: flex; justify-content: space-between;
-    font-size: 10px; color: #666; margin-top: 3px;
+    font-size: 10px; color: #888; margin-top: 3px;
   }
-  .poi-filter-actions { display: flex; gap: 6px; margin-bottom: 6px; }
-  .poi-filter-actions button {
-    flex: 1; padding: 4px 0; font-size: 11px; background: #12122a;
-    color: #888; border: 1px solid #2a2a4a; border-radius: 4px; cursor: pointer;
+  /* Place groups: legend and filter in one */
+  .group-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+  .group-row label {
+    flex: 1; display: flex; align-items: center; gap: 7px; min-width: 0;
+    font-size: 12px; color: #ccc; cursor: pointer;
   }
-  .poi-filter-actions button:hover { color: #ccc; background: #2a2a4a; }
-  .poi-type-list {
-    max-height: 130px; overflow-y: auto; display: grid;
-    grid-template-columns: 1fr 1fr; gap: 3px 6px;
-    padding-right: 2px;
+  .group-row input[type=checkbox] { accent-color: #7c83ff; flex-shrink: 0; }
+  .group-row .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  .group-row .group-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .group-row .group-count { font-size: 11px; color: #777; font-variant-numeric: tabular-nums; }
+  .group-row .only-spacer { width: 36px; flex-shrink: 0; }
+  .group-row .only-btn {
+    width: 36px; font-size: 10px; padding: 1px 0; background: none; color: #7c83ff;
+    border: 1px solid #3a3a6a; border-radius: 4px; cursor: pointer; visibility: hidden;
   }
-  .poi-type-list label {
-    font-size: 11px; color: #aaa; display: flex; align-items: center;
-    gap: 5px; cursor: pointer; white-space: nowrap; overflow: hidden;
-  }
-  .poi-type-list input[type=checkbox] { accent-color: #7c83ff; flex-shrink: 0; }
-  .type-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .group-row:hover .only-btn, .only-btn:focus { visibility: visible; }
 </style>
 </head>
 <body>
 
 <div id="sidebar">
   <h1>Grid POI Profiler</h1>
-  <p class="subtitle">Full Gurgaon — Targeted Taxi Ads</p>
+  <p class="lede">See who is around each 200 m area of Gurgaon, based on the places in and near it.</p>
 
   <div class="search-box">
-    <input type="text" id="searchInput" placeholder="Search location..." autocomplete="off"
+    <input type="text" id="searchInput" placeholder="Search a place, e.g. Cyber Hub" autocomplete="off"
            oninput="onSearchInput(this.value)" onkeydown="onSearchKey(event)">
     <span class="search-icon">&#128269;</span>
     <div class="search-results" id="searchResults"></div>
   </div>
 
-  <button class="btn" onclick="doGenerate()"><span class="icon">&#9638;</span> Generate Grid</button>
-  <button class="btn" onclick="doCollect()"><span class="icon">&#8681;</span> Collect POIs (API)</button>
-  <button class="btn btn-sm" onclick="doForceCollect()"><span class="icon">&#8635;</span> Force Re-collect (uses quota)</button>
-  <button class="btn" onclick="doCompute()"><span class="icon">&#9881;</span> Compute Profiles</button>
-  <button class="btn" onclick="doRefreshAll()"><span class="icon">&#8635;</span> Refresh Map</button>
+  <section class="panel">
+    <h2>Colour areas by</h2>
+    <div class="seg">
+      <button id="modeType" class="active" onclick="setColourMode('type')">Place type</button>
+      <button id="modeAge" onclick="setColourMode('age')">Age group</button>
+    </div>
+    <p class="hint" id="typeHint">Each area takes the colour of its most common type of place (key below).</p>
+    <div id="agePanel" hidden>
+      <div class="age-pills" id="agePills">
+        <button class="age-pill" data-age="0-12"  onclick="onAgeFilter(this)">0–12</button>
+        <button class="age-pill" data-age="13-17" onclick="onAgeFilter(this)">13–17</button>
+        <button class="age-pill" data-age="18-24" onclick="onAgeFilter(this)">18–24</button>
+        <button class="age-pill active" data-age="25-34" onclick="onAgeFilter(this)">25–34</button>
+        <button class="age-pill" data-age="35-50" onclick="onAgeFilter(this)">35–50</button>
+        <button class="age-pill" data-age="50+"   onclick="onAgeFilter(this)">50+</button>
+      </div>
+      <div class="age-gradient-legend">
+        <div class="grad-bar"></div>
+        <div class="grad-labels"><span id="ageLegendLow">Smaller share</span><span id="ageLegendHigh">Bigger share</span></div>
+      </div>
+      <p class="hint">Darker = a bigger share of people in this age group. Areas with almost none are hidden.</p>
+    </div>
+  </section>
 
-  <div class="stats" id="stats">
-    <div><span class="label">Grid points:</span> <span class="value" id="stat-grid">0</span></div>
-    <div><span class="label">POIs collected:</span> <span class="value" id="stat-pois">0</span></div>
-    <div><span class="label">Profiles:</span> <span class="value" id="stat-profiles">0</span></div>
-    <div><span class="label">Visible profiles:</span> <span class="value" id="stat-visible">0</span></div>
-  </div>
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Place types</h2>
+      <span><button class="link" onclick="setAllGroups(true)">All</button> · <button class="link" onclick="setAllGroups(false)">None</button></span>
+    </div>
+    <div id="groupList">
+      <span class="hint">Loading…</span>
+    </div>
+    <label class="check-row emphasis">
+      <input type="checkbox" id="filterHexByType" onchange="onHexFilterToggle(this)">
+      <span>Only show areas that contain the ticked types</span>
+    </label>
+  </section>
 
+  <section class="panel">
+    <h2>Show on map</h2>
+    <label class="check-row"><input type="checkbox" id="toggleProfiles" checked onchange="toggleLayer('profiles')"> Areas (hexagons)</label>
+    <label class="check-row"><input type="checkbox" id="togglePois" checked onchange="toggleLayer('pois')"> Place pins</label>
+  </section>
+
+  <p class="footer-stat"><b id="stat-visible">0</b> areas in view · hover for a name, click for the audience profile</p>
   <div id="status"></div>
 
-  <div class="layer-toggle">
-    <label><input type="checkbox" id="togglePois" checked onchange="toggleLayer('pois')"> POI Markers (clustered)</label>
-    <label><input type="checkbox" id="toggleProfiles" checked onchange="toggleLayer('profiles')"> Profile Hexagons</label>
-  </div>
-
-  <!-- ── FILTERS ── -->
-  <div class="filter-section">
-    <h3>Age Range — Profile Heatmap</h3>
-    <div class="age-pills" id="agePills">
-      <button class="age-pill active" data-age="" onclick="onAgeFilter(this)">All</button>
-      <button class="age-pill" data-age="0-12"  onclick="onAgeFilter(this)">0–12</button>
-      <button class="age-pill" data-age="13-17" onclick="onAgeFilter(this)">13–17</button>
-      <button class="age-pill" data-age="18-24" onclick="onAgeFilter(this)">18–24</button>
-      <button class="age-pill" data-age="25-34" onclick="onAgeFilter(this)">25–34</button>
-      <button class="age-pill" data-age="35-50" onclick="onAgeFilter(this)">35–50</button>
-      <button class="age-pill" data-age="50+"   onclick="onAgeFilter(this)">50+</button>
+  <details class="admin" id="adminPanel">
+    <summary>&#9881; Data setup</summary>
+    <p class="hint">Rebuilds the data behind the map. Only needed when the area or the places change.</p>
+    <button class="btn" onclick="doGenerate()"><b>1. Build hexagon grid</b><span>Splits Gurgaon into 200 m areas</span></button>
+    <button class="btn" onclick="doCollect()"><b>2. Fetch places from Google</b><span>Skipped if places are already stored</span></button>
+    <button class="btn" onclick="doCompute()"><b>3. Calculate audience profiles</b><span>Takes about 30 seconds</span></button>
+    <button class="btn" onclick="doRefreshAll()"><b>Reload map data</b></button>
+    <button class="btn btn-danger" onclick="doForceCollect()"><b>Re-fetch all places</b><span>Uses Google quota (about $109)</span></button>
+    <div class="stats">
+      Areas <b id="stat-grid">0</b> · Places <b id="stat-pois">0</b> · Profiles <b id="stat-profiles">0</b>
     </div>
-    <div class="age-gradient-legend" id="ageLegend">
-      <div class="grad-bar"></div>
-      <div class="grad-labels"><span>Low score</span><span>High score</span></div>
-    </div>
-
-    <h3>POI Type Filter</h3>
-    <div class="poi-filter-actions">
-      <button onclick="setAllPoiTypes(true)">Select all</button>
-      <button onclick="setAllPoiTypes(false)">Clear all</button>
-    </div>
-    <div class="poi-type-list" id="poiTypeList">
-      <span style="color:#555;font-size:11px">Load POIs to populate…</span>
-    </div>
-    <div class="layer-toggle" style="margin-top:10px">
-      <label title="Hide hexagons that contain no POI of the checked types">
-        <input type="checkbox" id="filterHexByType" onchange="renderViewportProfiles()">
-        Only show hexagons containing checked types
-      </label>
-    </div>
-  </div>
-
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:#ff6b6b"></div> Hospital/Health</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#ffd93d"></div> School/Education</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#6bcb77"></div> Shopping/Commercial</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#4d96ff"></div> Transit</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#ff922b"></div> Restaurant/Food</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> Office/Business</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> Park/Recreation</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div> Entertainment</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div> Lifestyle/Worship</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#94a3b8"></div> Lodging</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Hotel</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div> Residential</div>
-  </div>
+  </details>
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/supercluster@8.0.1/dist/supercluster.min.js"></script>
 <script>
 // Gurgaon center
 const CENTER = [28.44, 76.985];
@@ -236,197 +245,454 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; OpenStreetMap'
 }).addTo(map);
 
-// Layer groups
-const poiCluster = L.markerClusterGroup({
-  maxClusterRadius: 50,
-  disableClusteringAtZoom: 16,
-  spiderfyOnMaxZoom: true,
-  chunkedLoading: true,
+// ---- Place groups ----
+// Raw Google/keyword types fold into 8 groups. Each group also owns the land-use
+// values the backend assigns, so hexagons and POI dots share one colour key.
+// Colours are an 8-slot categorical palette; the pairs that are hardest to tell
+// apart sit on groups that are rarely common in the same areas, and every group
+// is also named in the legend, tooltips and popups (never colour alone).
+const GROUPS = [
+  { key: 'shopping',  label: 'Shopping, food & nightlife', color: '#2a78d6',
+    types: ['shopping_mall', 'store', 'restaurant', 'bar', 'night_club', 'movie_theater'], landuse: ['commercial', 'entertainment'] },
+  { key: 'homes',     label: 'Homes & worship', color: '#eda100',
+    types: ['residential', 'place_of_worship'], landuse: ['residential'] },
+  { key: 'parks',     label: 'Parks & fitness', color: '#008300',
+    types: ['park', 'gym'], landuse: ['recreation'] },
+  { key: 'offices',   label: 'Offices', color: '#1baf7a',
+    types: ['corporate_office', 'coworking_space', 'it_park'], landuse: ['office'] },
+  { key: 'hotels',    label: 'Hotels', color: '#e87ba4',
+    types: ['hotel', 'lodging'], landuse: ['hospitality'] },
+  { key: 'health',    label: 'Health', color: '#e34948',
+    types: ['hospital'], landuse: ['health'] },
+  { key: 'education', label: 'Education', color: '#6250d6',
+    types: ['school', 'university'], landuse: ['education'] },
+  { key: 'transit',   label: 'Transit', color: '#eb6834',
+    types: ['transit_station'], landuse: ['transit'] },
+];
+const OTHER_GROUP = { key: 'other', label: 'Other', color: '#9a9a95', types: [], landuse: [] };
+const ALL_GROUPS = [...GROUPS, OTHER_GROUP];
+const GROUP_OF_TYPE = {}, GROUP_OF_LANDUSE = {};
+ALL_GROUPS.forEach(g => {
+  g.types.forEach(t => { GROUP_OF_TYPE[t] = g; });
+  g.landuse.forEach(l => { GROUP_OF_LANDUSE[l] = g; });
 });
-map.addLayer(poiCluster);
-
-const profilesLayer = L.layerGroup().addTo(map);
-
-const layers = { pois: poiCluster, profiles: profilesLayer };
-
-const POI_COLORS = {
-  hospital: '#ff6b6b', school: '#ffd93d', university: '#ffd93d',
-  shopping_mall: '#6bcb77', store: '#6bcb77', restaurant: '#ff922b',
-  transit_station: '#4d96ff',
-  park: '#10b981', gym: '#10b981',
-  movie_theater: '#c084fc', bar: '#c084fc', night_club: '#c084fc',
-  place_of_worship: '#f472b6', lodging: '#94a3b8', hotel: '#f59e0b',
-  corporate_office: '#3b82f6', coworking_space: '#3b82f6', it_park: '#3b82f6',
-  residential: '#a78bfa',
-};
-
-const ATTR_COLORS = {
-  health: '#ff6b6b', education: '#ffd93d', commercial: '#6bcb77',
-  transit: '#4d96ff', residential: '#a78bfa', other: '#888',
-  office: '#3b82f6', recreation: '#10b981', entertainment: '#c084fc',
-  hospitality: '#94a3b8',
-};
+const groupOfType = t => GROUP_OF_TYPE[t] || OTHER_GROUP;
+const groupOfLanduse = l => GROUP_OF_LANDUSE[l] || OTHER_GROUP;
 
 const INTEREST_COLORS = {
-  education: '#ffd93d', shopping: '#6bcb77', food: '#ff922b',
-  health: '#ff6b6b', transit: '#4d96ff', entertainment: '#c084fc',
-  business: '#3b82f6', lifestyle: '#f472b6',
+  education: '#6250d6', shopping: '#2a78d6', food: '#2a78d6',
+  health: '#e34948', transit: '#eb6834', entertainment: '#2a78d6',
+  business: '#1baf7a', lifestyle: '#eda100',
 };
 
-// All data cached in memory
-let allGridPoints = [];
-let allPois = [];
-let allProfiles = [];
-let profileMap = {};  // grid_point_id -> profile
-let gpMap = {};       // grid_point_id -> grid_point
-let cellPoiCounts = {};  // grid_point_id -> {poi_type: count} for POIs inside that hexagon
+// Single-hue sequential ramp (light → dark) for the age heatmap
+const AGE_RAMP = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#0d366b'];
 
-// ---- Hex geometry ----
-// Pointy-top hexagons on the backend's lattice; filled in from /config on load.
+const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const prettyType = t => t.replace(/_/g, ' ');
+
+// ---- Data (columnar payloads from /cells and /pois/compact) ----
+let cells = [];          // {id, lat, lon, landuse}
+let cellIndexById = {};  // grid_point_id -> index into cells
+let ageBuckets = [];
+let ageValues = [];      // ageBuckets.length values per cell, flattened
+let allPois = [];        // {name, lat, lon, type, group, rating, reviews}
+let cellPoiCounts = [];  // cell index -> {groupKey: count} for places inside that hexagon
+
+// ---- Filter state ----
+const hiddenGroups = new Set();
+let hexFilterOn = false;
+let activeAgeIdx = -1;   // -1 = colour by main place type
+let ageThresholds = [];  // 6 cut points splitting the active age bucket into 7 equal-sized classes
+
+// ---- Hex geometry & spatial index ----
+// Pointy-top hexagons on the backend's lattice; spacing/origin come from /config.
 const EARTH_R = 6378137;
 let hexSpacingM = 200;
 let hexOriginLat = 28.35;
-let hexOffsets = [];  // [dLat, dLon] for each of the 6 vertices
+let hexOffsetsDeg = [];   // [dLat, dLon] for each of the 6 vertices
+const hexPixelCache = {}; // zoom -> [[dx, dy] x 6]
 
 function buildHexOffsets() {
   const circumradius = hexSpacingM / Math.sqrt(3);
   const cosLat = Math.cos(hexOriginLat * Math.PI / 180);
-  hexOffsets = [];
+  hexOffsetsDeg = [];
   for (let k = 0; k < 6; k++) {
     const theta = (30 + 60 * k) * Math.PI / 180;
-    const dx = circumradius * Math.cos(theta);
-    const dy = circumradius * Math.sin(theta);
-    hexOffsets.push([
-      (dy / EARTH_R) * 180 / Math.PI,
-      (dx / (EARTH_R * cosLat)) * 180 / Math.PI,
+    hexOffsetsDeg.push([
+      (circumradius * Math.sin(theta) / EARTH_R) * 180 / Math.PI,
+      (circumradius * Math.cos(theta) / (EARTH_R * cosLat)) * 180 / Math.PI,
     ]);
   }
+  for (const z in hexPixelCache) delete hexPixelCache[z];
 }
 buildHexOffsets();
 
-function hexVertices(gp) {
-  return hexOffsets.map(([dLat, dLon]) => [gp.lat + dLat, gp.lon + dLon]);
+/** Vertex offsets in pixels at zoom z (constant across this small area). */
+function hexPixelOffsets(z) {
+  if (!hexPixelCache[z]) {
+    const c = L.latLng(CENTER);
+    const p0 = map.project(c, z);
+    hexPixelCache[z] = hexOffsetsDeg.map(([dLat, dLon]) => {
+      const p = map.project([c.lat + dLat, c.lng + dLon], z);
+      return [p.x - p0.x, p.y - p0.y];
+    });
+  }
+  return hexPixelCache[z];
 }
 
-function poiPrimaryType(poi) {
-  return (poi.types || []).find(t => POI_COLORS[t]) || 'other';
-}
+// Buckets larger than a cell, so a point's containing cell is always in its 3x3 neighbourhood
+const BUCKET = 0.005;
+let cellBuckets = new Map();
+const bucketKey = (bi, bj) => bi * 100000 + bj;
 
-/** Put each POI in the hexagon that contains it (= nearest cell centre). */
-function assignPoisToCells() {
-  cellPoiCounts = {};
-  if (!allGridPoints.length || !allPois.length) return;
-
-  // Buckets larger than a cell, so the containing cell is always in the 3x3 neighbourhood
-  const B = 0.002;
-  const buckets = new Map();
-  allGridPoints.forEach(gp => {
-    const key = Math.floor(gp.lat / B) + ':' + Math.floor(gp.lon / B);
-    if (!buckets.has(key)) buckets.set(key, []);
-    buckets.get(key).push(gp);
+function buildCellIndex() {
+  cellBuckets = new Map();
+  cells.forEach((c, i) => {
+    const key = bucketKey(Math.floor(c.lat / BUCKET), Math.floor(c.lon / BUCKET));
+    if (!cellBuckets.has(key)) cellBuckets.set(key, []);
+    cellBuckets.get(key).push(i);
   });
+}
 
+/** Index of the hexagon containing (lat, lon) — i.e. the nearest centre — or -1 outside the grid. */
+function nearestCell(lat, lon) {
+  const bi = Math.floor(lat / BUCKET), bj = Math.floor(lon / BUCKET);
   const cosLat = Math.cos(hexOriginLat * Math.PI / 180);
   const maxD2 = (hexSpacingM / Math.sqrt(3)) ** 2 * 1.05;
-  allPois.forEach(poi => {
-    const bi = Math.floor(poi.lat / B), bj = Math.floor(poi.lon / B);
-    let best = null, bestD2 = Infinity;
-    for (let a = -1; a <= 1; a++) {
-      for (let b = -1; b <= 1; b++) {
-        const cell = buckets.get((bi + a) + ':' + (bj + b));
-        if (!cell) continue;
-        cell.forEach(gp => {
-          const dy = (poi.lat - gp.lat) * Math.PI / 180 * EARTH_R;
-          const dx = (poi.lon - gp.lon) * Math.PI / 180 * EARTH_R * cosLat;
-          const d2 = dx * dx + dy * dy;
-          if (d2 < bestD2) { bestD2 = d2; best = gp; }
-        });
+  let best = -1, bestD2 = Infinity;
+  for (let a = -1; a <= 1; a++) {
+    for (let b = -1; b <= 1; b++) {
+      const bucket = cellBuckets.get(bucketKey(bi + a, bj + b));
+      if (!bucket) continue;
+      for (const i of bucket) {
+        const dy = (lat - cells[i].lat) * Math.PI / 180 * EARTH_R;
+        const dx = (lon - cells[i].lon) * Math.PI / 180 * EARTH_R * cosLat;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestD2) { bestD2 = d2; best = i; }
       }
     }
-    if (!best || bestD2 > maxD2) return;  // outside the grid
-    const counts = cellPoiCounts[best.id] || (cellPoiCounts[best.id] = {});
-    const ptype = poiPrimaryType(poi);
-    counts[ptype] = (counts[ptype] || 0) + 1;
+  }
+  return bestD2 <= maxD2 ? best : -1;
+}
+
+function forEachCellInBounds(south, west, north, east, fn) {
+  const bi0 = Math.floor(south / BUCKET), bi1 = Math.floor(north / BUCKET);
+  const bj0 = Math.floor(west / BUCKET), bj1 = Math.floor(east / BUCKET);
+  for (let bi = bi0; bi <= bi1; bi++) {
+    for (let bj = bj0; bj <= bj1; bj++) {
+      const bucket = cellBuckets.get(bucketKey(bi, bj));
+      if (bucket) bucket.forEach(fn);
+    }
+  }
+}
+
+/** Put each POI in the hexagon that contains it. */
+function assignPoisToCells() {
+  cellPoiCounts = cells.map(() => null);
+  allPois.forEach(poi => {
+    const i = nearestCell(poi.lat, poi.lon);
+    if (i < 0) return;
+    const counts = cellPoiCounts[i] || (cellPoiCounts[i] = {});
+    counts[poi.group.key] = (counts[poi.group.key] || 0) + 1;
   });
 }
 
-// ---- Filter State ----
-const hiddenPoiTypes = new Set();   // types whose markers are hidden
-let activeAgeRange = '';            // '' = default geo-attr coloring
+/** The checked group with the most places inside the hexagon ('other' never counts), or null. */
+function topCheckedGroupInCell(i) {
+  const counts = cellPoiCounts[i];
+  if (!counts) return null;
+  let best = null, bestN = 0;
+  for (const g of GROUPS) {
+    const n = counts[g.key] || 0;
+    if (n > bestN && !hiddenGroups.has(g.key)) { best = g; bestN = n; }
+  }
+  return best;
+}
+
+/** Fill colour/opacity for a cell, or null if the current filters hide it. */
+function cellStyle(i) {
+  const filterGroup = hexFilterOn ? topCheckedGroupInCell(i) : null;
+  if (hexFilterOn && !filterGroup) return null;
+  if (activeAgeIdx >= 0) {
+    const v = ageValues[i * ageBuckets.length + activeAgeIdx];
+    if (v < 0.04) return null;  // hide negligible cells
+    let step = 0;
+    while (step < ageThresholds.length && v >= ageThresholds[step]) step++;
+    return { color: AGE_RAMP[step], opacity: 0.6 };
+  }
+  if (filterGroup) return { color: filterGroup.color, opacity: 0.55 };
+  return { color: groupOfLanduse(cells[i].landuse).color, opacity: 0.45 };
+}
+
+/** Name shown on hover: what the hexagon's colour stands for. */
+function cellLabel(i) {
+  if (activeAgeIdx >= 0) {
+    return `${ageBuckets[activeAgeIdx]}: ${Math.round(ageValues[i * ageBuckets.length + activeAgeIdx] * 100)}% of audience`;
+  }
+  const g = hexFilterOn ? topCheckedGroupInCell(i) : null;
+  return g ? `${g.label}: ${cellPoiCounts[i][g.key]} here` : groupOfLanduse(cells[i].landuse).label;
+}
+
+// ---- Hexagon layer: all cells drawn straight onto canvas tiles ----
+// One Leaflet layer instead of one object per hexagon; Leaflet only asks for the
+// tiles in view and reuses them while panning.
+const HexLayer = L.GridLayer.extend({
+  createTile(coords) {
+    const size = this.getTileSize();
+    const dpr = window.devicePixelRatio || 1;
+    const tile = L.DomUtil.create('canvas', 'leaflet-tile');
+    tile.width = size.x * dpr;
+    tile.height = size.y * dpr;
+    const ctx = tile.getContext('2d');
+    ctx.scale(dpr, dpr);
+    drawHexTile(ctx, coords, size);
+    return tile;
+  },
+});
+
+function drawHexTile(ctx, coords, size) {
+  if (!cells.length) return;
+  const z = coords.z;
+  const offs = hexPixelOffsets(z);
+  const radiusPx = Math.hypot(offs[0][0], offs[0][1]);
+  const ox = coords.x * size.x, oy = coords.y * size.y;
+  const nw = map.unproject([ox - radiusPx, oy - radiusPx], z);
+  const se = map.unproject([ox + size.x + radiusPx, oy + size.y + radiusPx], z);
+  const drawGap = radiusPx >= 6;  // white gap between cells once they are big enough to show it
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#ffffff';
+  forEachCellInBounds(se.lat, nw.lng, nw.lat, se.lng, i => {
+    const style = cellStyle(i);
+    if (!style) return;
+    const p = map.project([cells[i].lat, cells[i].lon], z);
+    const x = p.x - ox, y = p.y - oy;
+    ctx.beginPath();
+    ctx.moveTo(x + offs[0][0], y + offs[0][1]);
+    for (let k = 1; k < 6; k++) ctx.lineTo(x + offs[k][0], y + offs[k][1]);
+    ctx.closePath();
+    ctx.globalAlpha = style.opacity;
+    ctx.fillStyle = style.color;
+    ctx.fill();
+    if (drawGap) {
+      ctx.globalAlpha = 0.9;
+      ctx.stroke();
+    }
+  });
+}
+
+map.createPane('hexPane');
+map.getPane('hexPane').style.zIndex = 350;  // above base tiles, below POI markers
+const hexLayer = new HexLayer({ pane: 'hexPane', updateWhenZooming: false, keepBuffer: 4 }).addTo(map);
+
+function refreshHexes() {
+  hexLayer.redraw();
+  updateVisibleCount();
+}
+
+function updateVisibleCount() {
+  let visible = 0;
+  if (map.hasLayer(hexLayer)) {
+    const b = map.getBounds();
+    forEachCellInBounds(b.getSouth(), b.getWest(), b.getNorth(), b.getEast(), i => {
+      if (cellStyle(i)) visible++;
+    });
+  }
+  document.getElementById('stat-visible').textContent = visible.toLocaleString();
+}
+
+// Click a hexagon → its full profile, loaded on demand
+map.on('click', e => {
+  if (!map.hasLayer(hexLayer)) return;
+  const i = nearestCell(e.latlng.lat, e.latlng.lng);
+  if (i < 0 || !cellStyle(i)) return;
+  openCellPopup(i);
+});
+
+async function openCellPopup(i) {
+  const c = cells[i];
+  const popup = L.popup({ maxWidth: 400 })
+    .setLatLng([c.lat, c.lon])
+    .setContent('<div class="profile-popup">Loading…</div>')
+    .openOn(map);
+  try {
+    const data = await api('GET', `/profile/${encodeURIComponent(c.id)}`);
+    popup.setContent(buildProfilePopup(data));
+  } catch (e) {
+    popup.setContent('<div class="profile-popup">No profile for this area.</div>');
+  }
+}
+
+// Hover a hexagon → its name (or age share), so colour is never the only cue
+const hoverTip = L.tooltip({ direction: 'top', offset: [0, -4], className: 'hex-tip' });
+let hoverCell = -1;
+map.on('mousemove', e => {
+  const i = map.hasLayer(hexLayer) ? nearestCell(e.latlng.lat, e.latlng.lng) : -1;
+  const show = i >= 0 && cellStyle(i);
+  if (!show) {
+    if (hoverCell !== -1) { map.closeTooltip(hoverTip); hoverCell = -1; }
+    return;
+  }
+  if (i === hoverCell) return;
+  hoverCell = i;
+  const c = cells[i];
+  hoverTip.setLatLng([c.lat, c.lon]).setContent(cellLabel(i));
+  map.openTooltip(hoverTip);
+});
+map.on('mouseout', () => { map.closeTooltip(hoverTip); hoverCell = -1; });
+
+// ---- POI layer: Supercluster index, only the clusters/points in view are drawn ----
+const poiLayer = L.layerGroup().addTo(map);
+let poiIndex = null;
+
+function rebuildPoiIndex() {
+  const features = [];
+  allPois.forEach((p, i) => {
+    if (hiddenGroups.has(p.group.key)) return;
+    features.push({ type: 'Feature', properties: { i }, geometry: { type: 'Point', coordinates: [p.lon, p.lat] } });
+  });
+  poiIndex = new Supercluster({ radius: 60, maxZoom: 15 }).load(features);
+  renderPois();
+}
+
+function renderPois() {
+  poiLayer.clearLayers();
+  if (!poiIndex || !map.hasLayer(poiLayer)) return;
+  const b = map.getBounds().pad(0.2);
+  const items = poiIndex.getClusters([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], Math.round(map.getZoom()));
+  items.forEach(f => {
+    const [lon, lat] = f.geometry.coordinates;
+    if (f.properties.cluster) {
+      const n = f.properties.point_count;
+      const px = n < 10 ? 22 : n < 100 ? 26 : 32;
+      L.marker([lat, lon], {
+        icon: L.divIcon({ html: `<div>${f.properties.point_count_abbreviated}</div>`, className: 'poi-cluster', iconSize: [px, px] }),
+      }).on('click', () => {
+        map.flyTo([lat, lon], Math.min(poiIndex.getClusterExpansionZoom(f.properties.cluster_id), 18));
+      }).addTo(poiLayer);
+    } else {
+      const p = allPois[f.properties.i];
+      L.circleMarker([lat, lon], {
+        radius: 6, color: '#ffffff', weight: 1.5, fillColor: p.group.color, fillOpacity: 0.95,
+        bubblingMouseEvents: false,
+      }).bindPopup(() =>
+        `<b>${escapeHtml(p.name)}</b><br>${escapeHtml(prettyType(p.type))} · ${p.group.label}` +
+        `<br>Rating: ${p.rating ?? 'N/A'} &nbsp; Reviews: ${p.reviews ?? 'N/A'}`
+      ).addTo(poiLayer);
+    }
+  });
+}
+
+map.on('moveend', () => {
+  renderPois();
+  updateVisibleCount();
+});
+
+// ---- Filters ----
+
+/** 'type' colours areas by their main place type; 'age' by the share of one age group. */
+function setColourMode(mode) {
+  document.getElementById('modeType').classList.toggle('active', mode === 'type');
+  document.getElementById('modeAge').classList.toggle('active', mode === 'age');
+  document.getElementById('agePanel').hidden = mode !== 'age';
+  document.getElementById('typeHint').hidden = mode === 'age';
+  if (mode === 'age') {
+    onAgeFilter(document.querySelector('#agePills .age-pill.active'));
+  } else {
+    activeAgeIdx = -1;
+    computeAgeThresholds();
+    refreshHexes();
+  }
+}
 
 function onAgeFilter(btn) {
   document.querySelectorAll('#agePills .age-pill').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  activeAgeRange = btn.dataset.age;
-  document.getElementById('ageLegend').style.display = activeAgeRange ? 'block' : 'none';
-  renderViewportProfiles();
+  activeAgeIdx = ageBuckets.indexOf(btn.dataset.age);
+  computeAgeThresholds();
+  refreshHexes();
 }
 
-function buildPoiTypeList() {
-  const types = new Set();
-  allPois.forEach(poi => {
-    (poi.types || []).forEach(t => { if (POI_COLORS[t]) types.add(t); });
-  });
-  const container = document.getElementById('poiTypeList');
-  container.innerHTML = '';
-  [...types].sort().forEach(t => {
-    const color = POI_COLORS[t] || '#888';
-    const label = document.createElement('label');
-    label.title = t;
-    label.innerHTML =
-      `<input type="checkbox" value="${t}" ${hiddenPoiTypes.has(t) ? '' : 'checked'}
-         onchange="onPoiTypeToggle(this)">` +
-      `<span class="type-dot" style="background:${color}"></span>` +
-      `<span style="overflow:hidden;text-overflow:ellipsis">${t.replace(/_/g, ' ')}</span>`;
-    container.appendChild(label);
-  });
-}
-
-function onPoiTypeToggle(cb) {
-  if (!cb.checked) hiddenPoiTypes.add(cb.value);
-  else hiddenPoiTypes.delete(cb.value);
-  renderPois();
-  renderViewportProfiles();
-}
-
-function setAllPoiTypes(checked) {
-  document.querySelectorAll('#poiTypeList input[type=checkbox]').forEach(cb => {
-    cb.checked = checked;
-    if (!checked) hiddenPoiTypes.add(cb.value);
-    else hiddenPoiTypes.delete(cb.value);
-  });
-  renderPois();
-  renderViewportProfiles();
-}
-
-/** Count of POIs inside the hexagon whose type is currently checked. */
-function matchingPoisInCell(gpId) {
-  const counts = cellPoiCounts[gpId] || {};
-  let n = 0;
-  for (const [t, c] of Object.entries(counts)) {
-    // 'other' has no checkbox, so it never counts as a match
-    if (t !== 'other' && !hiddenPoiTypes.has(t)) n += c;
+/** Split the active bucket's non-negligible values into 7 equal-sized classes, one per ramp step. */
+function computeAgeThresholds() {
+  ageThresholds = [];
+  if (activeAgeIdx < 0) return;
+  const n = ageBuckets.length;
+  const vals = [];
+  for (let i = 0; i < cells.length; i++) {
+    const v = ageValues[i * n + activeAgeIdx];
+    if (v >= 0.04) vals.push(v);
   }
-  return n;
+  if (!vals.length) return;
+  vals.sort((a, b) => a - b);
+  for (let k = 1; k < AGE_RAMP.length; k++) ageThresholds.push(vals[Math.floor(vals.length * k / AGE_RAMP.length)]);
+  document.getElementById('ageLegendLow').textContent = `${Math.round(vals[0] * 100)}% of audience`;
+  document.getElementById('ageLegendHigh').textContent = `${Math.round(vals[vals.length - 1] * 100)}%`;
 }
 
-/** Blue → Green → Yellow → Red based on 0–1 score */
-function ageScoreColor(score) {
-  const h = Math.round(240 - score * 240);
-  return `hsl(${h}, 85%, 52%)`;
+function buildGroupList() {
+  const counts = {};
+  allPois.forEach(p => { counts[p.group.key] = (counts[p.group.key] || 0) + 1; });
+  document.getElementById('groupList').innerHTML = ALL_GROUPS.map(g => `
+    <div class="group-row">
+      <label title="${escapeHtml(g.types.map(prettyType).join(', ') || 'Places with no recognised type')}">
+        <input type="checkbox" value="${g.key}" ${hiddenGroups.has(g.key) ? '' : 'checked'} onchange="onGroupToggle(this)">
+        <span class="swatch" style="background:${g.color}"></span>
+        <span class="group-name">${g.label}</span>
+      </label>
+      <span class="group-count">${(counts[g.key] || 0).toLocaleString()}</span>
+      ${g === OTHER_GROUP ? '<span class="only-spacer"></span>' : `<button class="only-btn" onclick="showOnlyGroup('${g.key}')" title="Show only ${escapeHtml(g.label)}">only</button>`}
+    </div>`).join('');
 }
 
+function onGroupsChanged() {
+  document.querySelectorAll('#groupList input[type=checkbox]').forEach(cb => { cb.checked = !hiddenGroups.has(cb.value); });
+  rebuildPoiIndex();
+  if (hexFilterOn) refreshHexes();
+}
+
+function onGroupToggle(cb) {
+  if (cb.checked) hiddenGroups.delete(cb.value);
+  else hiddenGroups.add(cb.value);
+  onGroupsChanged();
+}
+
+function setAllGroups(checked) {
+  ALL_GROUPS.forEach(g => { if (checked) hiddenGroups.delete(g.key); else hiddenGroups.add(g.key); });
+  onGroupsChanged();
+}
+
+/** One click: show only this group's places and the hexagons that contain them. */
+function showOnlyGroup(key) {
+  ALL_GROUPS.forEach(g => { if (g.key === key) hiddenGroups.delete(g.key); else hiddenGroups.add(g.key); });
+  hexFilterOn = true;
+  document.getElementById('filterHexByType').checked = true;
+  onGroupsChanged();
+  refreshHexes();
+}
+
+function onHexFilterToggle(cb) {
+  hexFilterOn = cb.checked;
+  refreshHexes();
+}
+
+let statusTimer = null;
 function setStatus(msg, type) {
   const el = document.getElementById('status');
   el.textContent = msg;
   el.className = type;
+  clearTimeout(statusTimer);
+  if (type === 'success') statusTimer = setTimeout(() => { el.className = ''; }, 3000);
 }
 
 function toggleLayer(name) {
   const id = 'toggle' + name.charAt(0).toUpperCase() + name.slice(1);
   const checked = document.getElementById(id).checked;
-  if (checked) map.addLayer(layers[name]);
-  else map.removeLayer(layers[name]);
+  const layer = name === 'pois' ? poiLayer : hexLayer;
+  if (checked) map.addLayer(layer);
+  else map.removeLayer(layer);
+  if (name === 'pois') renderPois();
+  else updateVisibleCount();
 }
 
 // Use Render backend directly in production, relative paths for local dev
@@ -455,20 +721,14 @@ async function doGenerate() {
   setStatus('Generating grid (this may take a moment for full Gurgaon)...', 'info');
   const data = await api('POST', '/grid/generate');
   setStatus(data.message, 'success');
-  await loadGrid();
+  await doRefreshAll();
 }
 
 async function doCollect() {
-  setStatus('Checking stored POIs...', 'info');
-  const data = await api('POST', '/collect');
-  if (data.cached) {
-    setStatus(data.message, 'success');
-    await loadPois();
-    return;
-  }
   setStatus('Collecting POIs (this will take several minutes for full Gurgaon)...', 'info');
+  const data = await api('POST', '/collect');
   setStatus(data.message, 'success');
-  await loadPois();
+  await doRefreshAll();
 }
 
 async function doForceCollect() {
@@ -476,100 +736,93 @@ async function doForceCollect() {
   setStatus('Re-collecting POIs from API (several minutes)...', 'info');
   const data = await api('POST', '/collect?force=true');
   setStatus(data.message, 'success');
-  await loadPois();
+  await doRefreshAll();
 }
 
 async function doCompute() {
   setStatus('Computing profiles for all grid points (may take a minute)...', 'info');
   const data = await api('POST', '/compute-profiles');
   setStatus(data.message, 'success');
-  await loadProfiles();
-}
-
-async function loadConfig() {
-  const cfg = await api('GET', '/config');
-  hexSpacingM = cfg.grid_spacing_m;
-  hexOriginLat = cfg.bbox.south;
-  buildHexOffsets();
+  await doRefreshAll();
 }
 
 async function doRefreshAll() {
   setStatus('Loading data...', 'info');
-  await loadConfig();
-  await loadGrid();
-  await loadPois();
-  await loadProfiles();
-  setStatus(`Loaded: ${allGridPoints.length} grid pts, ${allPois.length} POIs, ${allProfiles.length} profiles`, 'success');
-}
+  const [cfg, cellData, poiData] = await Promise.all([
+    api('GET', '/config'), api('GET', '/cells'), api('GET', '/pois/compact'),
+  ]);
 
-// ---- Data Loaders ----
+  hexSpacingM = cfg.grid_spacing_m;
+  hexOriginLat = cfg.bbox.south;
+  buildHexOffsets();
 
-async function loadGrid() {
-  const data = await api('GET', '/grid');
-  allGridPoints = data.grid_points;
-  gpMap = {};
-  allGridPoints.forEach(gp => { gpMap[gp.id] = gp; });
-  document.getElementById('stat-grid').textContent = data.count;
-  assignPoisToCells();
-}
+  cells = cellData.id.map((id, i) => ({
+    id, lat: cellData.lat[i], lon: cellData.lon[i],
+    landuse: cellData.geo[i] >= 0 ? cellData.geo_labels[cellData.geo[i]] : null,
+  }));
+  cellIndexById = {};
+  cells.forEach((c, i) => { cellIndexById[c.id] = i; });
+  ageBuckets = cellData.age_buckets;
+  ageValues = cellData.age;
+  buildCellIndex();
 
-async function loadPois() {
-  const data = await api('GET', '/pois');
-  allPois = data.pois;
-  document.getElementById('stat-pois').textContent = data.count;
-  assignPoisToCells();
-  buildPoiTypeList();
-  renderPois();
-}
-
-async function loadProfiles() {
-  const data = await api('GET', '/profiles');
-  allProfiles = data.profiles;
-  profileMap = {};
-  allProfiles.forEach(p => { profileMap[p.grid_point_id] = p; });
-  document.getElementById('stat-profiles').textContent = data.count;
-  renderViewportProfiles();
-}
-
-// ---- Renderers ----
-
-function renderPois() {
-  poiCluster.clearLayers();
-  const markers = [];
-  allPois.forEach(poi => {
-    const ptype = poiPrimaryType(poi);
-    if (hiddenPoiTypes.has(ptype)) return;
-    const color = POI_COLORS[ptype] || '#888';
-    const marker = L.circleMarker([poi.lat, poi.lon], {
-      radius: 6, color, fillColor: color, fillOpacity: 0.85, weight: 1,
-    });
-    marker.bindPopup(`<b>${poi.name}</b><br>Type: ${ptype}<br>Rating: ${poi.rating || 'N/A'}<br>Reviews: ${poi.user_ratings_total || 'N/A'}`);
-    markers.push(marker);
+  allPois = poiData.name.map((name, i) => {
+    const type = poiData.types[poiData.type[i]];
+    return {
+      name, type, group: groupOfType(type),
+      lat: poiData.lat[i], lon: poiData.lon[i],
+      rating: poiData.rating[i], reviews: poiData.reviews[i],
+    };
   });
-  poiCluster.addLayers(markers);
+  assignPoisToCells();
+
+  document.getElementById('stat-grid').textContent = cellData.count.toLocaleString();
+  document.getElementById('stat-profiles').textContent = cellData.profiles.toLocaleString();
+  document.getElementById('stat-pois').textContent = poiData.count.toLocaleString();
+
+  buildGroupList();
+  computeAgeThresholds();
+  rebuildPoiIndex();
+  refreshHexes();
+  setStatus(`Loaded: ${cells.length.toLocaleString()} areas, ${allPois.length.toLocaleString()} places`, 'success');
 }
 
-function buildProfilePopup(p) {
-  const attrs = p.geo_attrs || [];
-  const audience = p.audience || {};
+// ---- Profile popup ----
+
+function groupChips(countsByGroup) {
+  return Object.entries(countsByGroup)
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, n]) => {
+      const g = ALL_GROUPS.find(x => x.key === key) || OTHER_GROUP;
+      return `<span class="chip"><i style="background:${g.color}"></i>${g.label}: ${n}</span>`;
+    }).join('') || 'none';
+}
+
+function buildProfilePopup(data, title) {
+  const attrs = data.geographic_attributes || [];
+  const audience = data.audience || {};
   const ageProfile = audience.age_profile || {};
   const interests = audience.interests || {};
-  const counts = (p.poi_summary || {}).counts || {};
-  const inCell = cellPoiCounts[p.grid_point_id] || {};
+  const nearbyByGroup = {};
+  for (const [t, c] of Object.entries((data.poi_summary || {}).counts || {})) {
+    const key = groupOfType(t).key;
+    nearbyByGroup[key] = (nearbyByGroup[key] || 0) + c;
+  }
+  const i = cellIndexById[data.grid_point_id];
+  const inCell = (i !== undefined && cellPoiCounts[i]) || {};
 
   let html = `<div class="profile-popup">
-    <h3>${p.grid_point_id}</h3>
-    <div class="section"><b>Geo:</b> ${attrs.join(', ') || 'none'}</div>
-    <div class="section"><b>Inside this hexagon:</b> ${
-      Object.entries(inCell).map(([t, c]) => `${t.replace(/_/g, ' ')}: ${c}`).join(', ') || 'no POIs'
-    }</div>
+    <h3>${title || `${groupOfLanduse(attrs[0]).label} area`}</h3>
+    <div class="muted">Area ${escapeHtml(data.grid_point_id)} · ${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}</div>
+    <div class="section"><b>Area type:</b> ${attrs.map(a => groupOfLanduse(a).label).filter((v, k, arr) => arr.indexOf(v) === k).join(', ') || 'none'}</div>
+    <div class="section"><b>Inside this hexagon:</b><br>${groupChips(inCell)}</div>
     <div class="section"><b>Confidence:</b> ${audience.confidence || 0} &nbsp; <b>Footfall:</b> ${audience.footfall_proxy || 0}</div>
     <div class="section"><b>Age Profile</b>`;
   for (const [bucket, val] of Object.entries(ageProfile)) {
     const pct = Math.round(val * 100);
     html += `<div class="bar-row">
       <span class="bar-label">${bucket}</span>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:#7c83ff"></div></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:#3987e5"></div></div>
       <span class="bar-val">${pct}%</span>
     </div>`;
   }
@@ -583,56 +836,9 @@ function buildProfilePopup(p) {
       <span class="bar-val">${pct}%</span>
     </div>`;
   }
-  html += `</div>`;
-  if (Object.keys(counts).length) {
-    html += `<div class="section"><b>Nearby POIs (within 1 km)</b><br>`;
-    for (const [t, c] of Object.entries(counts)) {
-      html += `${t}: ${c} &nbsp; `;
-    }
-    html += `</div>`;
-  }
-  html += `</div>`;
+  html += `</div><div class="section"><b>Nearby places (within 1 km)</b><br>${groupChips(nearbyByGroup)}</div></div>`;
   return html;
 }
-
-function renderViewportProfiles() {
-  profilesLayer.clearLayers();
-  if (!allProfiles.length) return;
-
-  const bounds = map.getBounds();
-  const filterByType = document.getElementById('filterHexByType').checked;
-  let visible = 0;
-
-  allProfiles.forEach(p => {
-    const gp = gpMap[p.grid_point_id];
-    if (!gp) return;
-    if (!bounds.contains([gp.lat, gp.lon])) return;
-    if (filterByType && !matchingPoisInCell(gp.id)) return;
-
-    let color, fillOpacity;
-    if (activeAgeRange) {
-      const score = (p.audience?.age_profile || {})[activeAgeRange] || 0;
-      if (score < 0.04) return;   // hide negligible grid points
-      color = ageScoreColor(score);
-      fillOpacity = 0.15 + score * 0.55;
-    } else {
-      const attrs = p.geo_attrs || [];
-      const dominant = attrs[0] || 'other';
-      color = ATTR_COLORS[dominant] || '#888';
-      fillOpacity = 0.2;
-    }
-
-    L.polygon(hexVertices(gp), {
-      color, fillColor: color, fillOpacity, weight: 1,
-    }).bindPopup(buildProfilePopup(p), { maxWidth: 400 }).addTo(profilesLayer);
-    visible++;
-  });
-
-  document.getElementById('stat-visible').textContent = visible;
-}
-
-// Re-render profiles when viewport changes
-map.on('moveend', renderViewportProfiles);
 
 // ---- Location Search (Nominatim geocoding) ----
 
@@ -677,6 +883,8 @@ async function doSearch(query) {
   }
 }
 
+let searchResultsCache = [];
+
 function renderSearchResults(results) {
   const resultsEl = document.getElementById('searchResults');
   if (!results.length) {
@@ -684,19 +892,22 @@ function renderSearchResults(results) {
     resultsEl.className = 'search-results visible';
     return;
   }
+  searchResultsCache = results;
   resultsEl.innerHTML = results.map((r, i) => {
     const parts = r.display_name.split(', ');
-    const name = parts[0];
-    const addr = parts.slice(1, 4).join(', ');
-    return `<div class="search-result-item" onclick="selectSearchResult(${r.lat}, ${r.lon}, '${name.replace(/'/g, "\\'")}')">
-      <div class="result-name">${name}</div>
-      <div class="result-addr">${addr}</div>
+    return `<div class="search-result-item" onclick="selectSearchResult(${i})">
+      <div class="result-name">${escapeHtml(parts[0])}</div>
+      <div class="result-addr">${escapeHtml(parts.slice(1, 4).join(', '))}</div>
     </div>`;
   }).join('');
   resultsEl.className = 'search-results visible';
 }
 
-function selectSearchResult(lat, lon, name) {
+function selectSearchResult(idx) {
+  const r = searchResultsCache[idx];
+  const lat = parseFloat(r.lat), lon = parseFloat(r.lon);
+  const name = r.display_name.split(', ')[0];
+
   // Hide results
   document.getElementById('searchResults').className = 'search-results';
   document.getElementById('searchInput').value = name;
@@ -706,7 +917,7 @@ function selectSearchResult(lat, lon, name) {
 
   // Add marker at searched location
   searchMarker = L.marker([lat, lon]).addTo(map);
-  searchMarker.bindPopup(`<b>${name}</b><br><small>${lat.toFixed(5)}, ${lon.toFixed(5)}</small><br><br><em>Loading nearest profile...</em>`).openPopup();
+  searchMarker.bindPopup(`<b>${escapeHtml(name)}</b><br><small>${lat.toFixed(5)}, ${lon.toFixed(5)}</small><br><br><em>Loading nearest profile...</em>`).openPopup();
 
   // Fly to location
   map.flyTo([lat, lon], 15, { duration: 1.2 });
@@ -718,52 +929,13 @@ function selectSearchResult(lat, lon, name) {
 async function fetchProfileFor(lat, lon, name) {
   try {
     const data = await api('GET', `/profile?lat=${lat}&lon=${lon}`);
-    const audience = data.audience || {};
-    const ageProfile = audience.age_profile || {};
-    const interests = audience.interests || {};
-    const counts = (data.poi_summary || {}).counts || {};
-
-    let html = `<div class="profile-popup">
-      <h3>${name}</h3>
-      <div class="section" style="color:#888;font-size:11px">Nearest grid: ${data.grid_point_id} (${data.lat.toFixed(5)}, ${data.lon.toFixed(5)})</div>
-      <div class="section"><b>Geo:</b> ${(data.geographic_attributes || []).join(', ') || 'none'}</div>
-      <div class="section"><b>Confidence:</b> ${audience.confidence || 0} &nbsp; <b>Footfall:</b> ${audience.footfall_proxy || 0}</div>
-      <div class="section"><b>Age Profile</b>`;
-    for (const [bucket, val] of Object.entries(ageProfile)) {
-      const pct = Math.round(val * 100);
-      html += `<div class="bar-row">
-        <span class="bar-label">${bucket}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:#7c83ff"></div></div>
-        <span class="bar-val">${pct}%</span>
-      </div>`;
-    }
-    html += `</div><div class="section"><b>Interests</b>`;
-    for (const [cat, val] of Object.entries(interests)) {
-      const pct = Math.round(val * 100);
-      const iColor = INTEREST_COLORS[cat] || '#888';
-      html += `<div class="bar-row">
-        <span class="bar-label">${cat}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${iColor}"></div></div>
-        <span class="bar-val">${pct}%</span>
-      </div>`;
-    }
-    html += `</div>`;
-    if (Object.keys(counts).length) {
-      html += `<div class="section"><b>Nearby POIs</b><br>`;
-      for (const [t, c] of Object.entries(counts)) {
-        html += `${t}: ${c} &nbsp; `;
-      }
-      html += `</div>`;
-    }
-    html += `</div>`;
-
     if (searchMarker) {
-      searchMarker.setPopupContent(html);
+      searchMarker.setPopupContent(buildProfilePopup(data, escapeHtml(name)));
       searchMarker.openPopup();
     }
   } catch (e) {
     if (searchMarker) {
-      searchMarker.setPopupContent(`<b>${name}</b><br><small>No profile available for this location</small>`);
+      searchMarker.setPopupContent(`<b>${escapeHtml(name)}</b><br><small>No profile available for this location</small>`);
     }
   }
 }
@@ -775,14 +947,9 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Hide write buttons in production (writes are local-only)
+// Hide data setup in production (writes are local-only)
 if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-  document.querySelectorAll('button').forEach(btn => {
-    const text = btn.textContent;
-    if (text.includes('Generate') || text.includes('Collect') || text.includes('Compute') || text.includes('Force')) {
-      btn.style.display = 'none';
-    }
-  });
+  document.getElementById('adminPanel').hidden = true;
 }
 
 // Initial load
