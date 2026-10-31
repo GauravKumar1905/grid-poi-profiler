@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import os
+import threading
 from contextlib import asynccontextmanager
 from typing import Callable
 
@@ -21,10 +22,20 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 
 
+def _init_db_in_background() -> None:
+    try:
+        db.init_db()
+        logger.info("Database initialized")
+    except Exception:
+        logger.exception("Database initialization failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db.init_db()
-    logger.info("Database initialized")
+    # With Turso, init_db() first syncs the local replica, which can take many
+    # minutes on a fresh instance. Run it in the background so the server binds
+    # its port immediately (Render fails a deploy that doesn't bind in time).
+    threading.Thread(target=_init_db_in_background, daemon=True).start()
     yield
 
 
@@ -98,7 +109,7 @@ async def health():
 # ---------- Grid ----------
 
 @app.get("/grid")
-async def get_grid(request: Request):
+def get_grid(request: Request):
     return _cached_json(request, "grid", lambda: {"count": len(_grid_points()), "grid_points": _grid_points()})
 
 
@@ -122,7 +133,7 @@ def generate_grid_endpoint(force: bool = Query(False, description="Delete the gr
 # ---------- POIs ----------
 
 @app.get("/pois")
-async def get_pois(request: Request):
+def get_pois(request: Request):
     def build():
         pois = db.get_all_pois()
         return {"count": len(pois), "pois": pois}
@@ -130,7 +141,7 @@ async def get_pois(request: Request):
 
 
 @app.get("/pois/compact")
-async def get_pois_compact(request: Request):
+def get_pois_compact(request: Request):
     """Columnar POI data for the map: one array per field, types as indexes into `types`."""
     def build():
         pois = db.get_all_pois()
@@ -175,7 +186,7 @@ def collect_mock_pois_endpoint():
 # ---------- Profiles ----------
 
 @app.get("/profiles")
-async def get_profiles(request: Request):
+def get_profiles(request: Request):
     def build():
         profiles = db.get_all_profiles()
         return {"count": len(profiles), "profiles": profiles}
@@ -183,7 +194,7 @@ async def get_profiles(request: Request):
 
 
 @app.get("/cells")
-async def get_cells(request: Request):
+def get_cells(request: Request):
     """Columnar per-cell data: just what the map needs to draw, colour and filter hexagons.
 
     `geo` is an index into `geo_labels` (-1 = no profile); `age` holds
@@ -238,7 +249,7 @@ def _profile_response(gp: dict) -> dict:
 
 
 @app.get("/profile")
-async def get_nearest_profile(
+def get_nearest_profile(
     lat: float = Query(..., description="Latitude"),
     lon: float = Query(..., description="Longitude"),
 ):
@@ -251,7 +262,7 @@ async def get_nearest_profile(
 
 
 @app.get("/profile/{grid_point_id}")
-async def get_profile_by_id(grid_point_id: str):
+def get_profile_by_id(grid_point_id: str):
     """Return the full profile for one cell (loaded on demand when a hexagon is clicked)."""
     gp = _memo("grid_by_id", lambda: {g["id"]: g for g in _grid_points()}).get(grid_point_id)
     if not gp:
